@@ -1,0 +1,210 @@
+"""
+Intent extraction: natural-language question -> validated structured intent.
+
+Two stages, deliberately separated:
+
+  1. Qwen (via Ollama) reads the question and fills in slots. Its
+     system prompt contains the REAL vocabulary harvested from
+     fact_generic -- the actual 39 crops, 7 provinces, 80 districts,
+     3 measures, 3 periods -- so it picks from values that exist
+     rather than inventing plausible-sounding ones.
+
+  2. Every slot it returns is validated against that same vocabulary
+     before any SQL is built. A value that doesn't resolve FAILS
+     LOUDLY with suggestions instead of silently producing zero rows.
+
+Stage 2 exists even though stage 1 is constrained, because "put the
+list in the prompt" reduces hallucination but does not eliminate it --
+the model can still return a near-miss ("Sudurpaschim" for
+"Sudurpashchim") or drift on formatting. Validation is what makes
+a wrong value impossible rather than merely unlikely.
+
+Requires: ollama running locally (http://localhost:11434) with
+qwen2.5:7b-instruct pulled. No fallback path by design -- if the
+model is unavailable, this raises rather than silently degrading.
+"""
+import json
+import re
+import urllib.request
+
+OLLAMA_URL = "http://localhost:11434/api/generate"
+DEFAULT_MODEL = "qwen2.5:7b-instruct"
+
+SYSTEM_PROMPT = """You extract structured query intent from questions about Nepali agriculture statistics.
+
+Return ONLY a JSON object. No prose, no markdown fences, no explanation.
+
+Schema:
+{{
+  "intent": one of ["lookup", "superlative", "aggregate", "compare_periods"],
+  "crop": crop name or null,
+  "place": place name or null,
+  "entity_type": one of ["national", "province", "district"] or null,
+  "measure": one of ["Area", "Production", "Yield"] or null,
+  "period": period string or null,
+  "period_2": second period (only for compare_periods) or null,
+  "direction": "max" or "min" (only for superlative) or null
+}}
+
+Intent meanings:
+- lookup: a single specific value ("how much paddy did Koshi produce in 2080/81")
+- superlative: highest/lowest across entities ("which province produced the most maize")
+- aggregate: a total across entities ("total cereal production in 2080/81")
+- compare_periods: change between two periods ("how did paddy production change from 2078/79 to 2080/81")
+
+For "superlative" questions, entity_type is the KIND of thing being ranked
+(e.g. "which province..." -> "province", "which district..." -> "district").
+
+ONLY use values from these lists. If the question mentions something not in
+these lists, put the user's original word in the field anyway -- validation
+downstream will catch it and report it properly.
+
+CROPS: {crops}
+PROVINCES: {provinces}
+DISTRICTS: {districts}
+MEASURES: {measures}
+PERIODS: {periods}
+
+Examples:
+
+Question: which province produced the most paddy in 2080/81
+{{"intent": "superlative", "crop": "Paddy", "place": null, "entity_type": "province", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
+
+Question: how much rice did Jhapa grow last year
+{{"intent": "lookup", "crop": "Paddy", "place": "JHAPA", "entity_type": "district", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Question: how did wheat production change from 2078/79 to 2080/81
+{{"intent": "compare_periods", "crop": "Wheat", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+"""
+
+
+class IntentError(Exception):
+    """Raised when the question can't be resolved against the vocabulary."""
+    pass
+
+
+def call_ollama(prompt, system, model=DEFAULT_MODEL, timeout=120):
+    payload = {
+        "model": model,
+        "prompt": prompt,
+        "system": system,
+        "stream": False,
+        "format": "json",       # ollama's JSON mode -- constrains output
+        "options": {"temperature": 0},   # deterministic: same question -> same intent
+    }
+    req = urllib.request.Request(
+        OLLAMA_URL,
+        data=json.dumps(payload).encode(),
+        headers={"Content-Type": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            return json.loads(resp.read())["response"]
+    except urllib.error.URLError as e:
+        raise IntentError(
+            f"Could not reach Ollama at {OLLAMA_URL} -- is `ollama serve` running? ({e})"
+        )
+
+
+def parse_json_response(text):
+    """Ollama's format:json should give clean JSON, but strip fences defensively."""
+    text = text.strip()
+    text = re.sub(r"^```(?:json)?|```$", "", text, flags=re.MULTILINE).strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise IntentError(f"Model returned unparseable JSON: {text[:200]!r} ({e})")
+
+
+def extract_intent(question, vocab, model=DEFAULT_MODEL, verbose=False):
+    """Returns a validated intent dict. Raises IntentError on anything unresolvable."""
+    system = SYSTEM_PROMPT.format(
+        crops=", ".join(vocab.crops),
+        provinces=", ".join(vocab.provinces),
+        districts=", ".join(vocab.districts),
+        measures=", ".join(vocab.measures),
+        periods=", ".join(vocab.periods),
+    )
+    raw = call_ollama(f"Question: {question}", system, model=model)
+    if verbose:
+        print(f"[raw model output] {raw.strip()}")
+    intent = parse_json_response(raw)
+
+    return validate_intent(intent, vocab, verbose=verbose)
+
+
+def validate_intent(intent, vocab, verbose=False):
+    """Check every slot against the real vocabulary. This is what makes a
+    hallucinated value impossible rather than merely unlikely."""
+    valid_intents = {"lookup", "superlative", "aggregate", "compare_periods"}
+    kind = intent.get("intent")
+    if kind not in valid_intents:
+        raise IntentError(f"Unknown intent type {kind!r}; expected one of {sorted(valid_intents)}")
+
+    out = {"intent": kind}
+
+    crop = intent.get("crop")
+    if crop:
+        matched, how = vocab.match_crop(crop)
+        if not matched:
+            raise IntentError(
+                f"Unknown crop {crop!r}. Did you mean: {how}?" if how
+                else f"Unknown crop {crop!r} -- not present in this dataset.")
+        if verbose and how != "exact":
+            print(f"[validate] crop: {how}")
+        out["crop"] = matched
+    else:
+        out["crop"] = None
+
+    place = intent.get("place")
+    if place:
+        matched, etype, how = vocab.match_place(place)
+        if not matched:
+            raise IntentError(
+                f"Unknown place {place!r}. Did you mean: {how}?" if how
+                else f"Unknown place {place!r} -- not present in this dataset.")
+        if verbose and how != "exact":
+            print(f"[validate] place: {how}")
+        out["place"] = matched
+        out["entity_type"] = etype     # trust the vocabulary over the model here
+    else:
+        out["place"] = None
+        etype = intent.get("entity_type")
+        if etype and etype not in vocab.entity_types:
+            raise IntentError(f"Unknown entity_type {etype!r}; expected one of {vocab.entity_types}")
+        out["entity_type"] = etype
+
+    measure = intent.get("measure")
+    if measure:
+        matched, how = vocab.match_measure(measure)
+        if not matched:
+            raise IntentError(
+                f"Unknown measure {measure!r}. Did you mean: {how}?" if how
+                else f"Unknown measure {measure!r}.")
+        out["measure"] = matched
+    else:
+        out["measure"] = "Production"    # sensible default for this dataset
+
+    for key in ("period", "period_2"):
+        value = intent.get(key)
+        if value:
+            matched, how = vocab.match_period(value)
+            if not matched:
+                raise IntentError(
+                    f"Unknown period {value!r}. Available: {vocab.periods}")
+            out[key] = matched
+        else:
+            out[key] = None
+
+    direction = intent.get("direction")
+    if kind == "superlative":
+        if direction not in ("max", "min"):
+            direction = "max"
+        out["direction"] = direction
+    else:
+        out["direction"] = None
+
+    if kind == "compare_periods" and not (out["period"] and out["period_2"]):
+        raise IntentError("compare_periods needs two periods; only got one.")
+
+    return out
