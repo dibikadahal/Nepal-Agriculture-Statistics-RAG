@@ -29,6 +29,7 @@ will need a small manual alias added (SPELLING_ALIASES below) once you
 spot one in validation output.
 """
 import sqlite3
+from canonicalize import canonical_province, canonical_district
 
 PROVINCES = {"Koshi", "Madhesh", "Bagmati", "Gandaki", "Lumbini",
              "Karnali", "Sudurpashchim", "Sudurpaschim"}
@@ -52,10 +53,20 @@ def build_district_vocab(fact_db_path: str):
         for name, path in rows:
             province = path.split(" > ")[0] if path and " > " in path else None
             if province:
-                vocab[name.strip().upper()] = province
+                vocab[canonical_district(name)] = canonical_province(province)
     except sqlite3.OperationalError:
         pass  # fact.db doesn't exist yet or has no fact table -- empty vocab is fine
     return vocab
+
+
+def _province_match(text: str):
+    """Case-insensitive province lookup -- some tables write province
+    names in ALL CAPS (e.g. 'KOSHI'), which a plain 'in PROVINCES' check
+    misses since PROVINCES is stored in title case."""
+    for p in PROVINCES:
+        if text.strip().lower() == p.lower():
+            return canonical_province(p)
+    return None
 
 
 def classify_entity(label: tuple, district_vocab: dict):
@@ -64,14 +75,16 @@ def classify_entity(label: tuple, district_vocab: dict):
 
     if len(label) == 1:
         text = label[0].strip()
-        text_key = SPELLING_ALIASES.get(text.upper(), text.upper())
+        text_key = canonical_district(SPELLING_ALIASES.get(text.upper(), text))
         if text.lower() in NATIONAL_LABELS:
             return dict(entity_type="national", entity_name="Nepal", entity_path="Nepal")
-        if text in PROVINCES:
-            return dict(entity_type="province", entity_name=text, entity_path=text)
+        province_match = _province_match(text)
+        if province_match:
+            return dict(entity_type="province", entity_name=province_match, entity_path=province_match)
         if text_key in district_vocab:
-            province = district_vocab[text_key]
-            return dict(entity_type="district", entity_name=text, entity_path=f"{province} > {text}")
+            province = canonical_province(district_vocab[text_key])
+            canon = canonical_district(text)
+            return dict(entity_type="district", entity_name=canon, entity_path=f"{province} > {canon}")
         # not a known geography -- crop, category, product, etc.
         return dict(entity_type="row", entity_name=text, entity_path=text)
 
@@ -79,10 +92,12 @@ def classify_entity(label: tuple, district_vocab: dict):
         first, second = (label[0] or "").strip(), (label[1] or "").strip()
         if first.lower() in NATIONAL_LABELS:
             return dict(entity_type="national", entity_name="Nepal", entity_path="Nepal")
-        if first in PROVINCES and not second:
-            return dict(entity_type="province", entity_name=first, entity_path=first)
-        if first in PROVINCES and second:
-            return dict(entity_type="district", entity_name=second, entity_path=f"{first} > {second}")
+        province_match = _province_match(first)
+        if province_match and not second:
+            return dict(entity_type="province", entity_name=province_match, entity_path=province_match)
+        if province_match and second:
+            canon = canonical_district(second)
+            return dict(entity_type="district", entity_name=canon, entity_path=f"{province_match} > {canon}")
         return dict(entity_type="row", entity_name=" / ".join(label), entity_path=" / ".join(label))
 
     # 3+ label columns -- rare in this PDF, fall back to a joined generic label

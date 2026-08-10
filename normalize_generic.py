@@ -11,16 +11,59 @@ from datetime import datetime, timezone
 from generic_melt import melt_table
 from classify_entity import build_district_vocab, classify_entity
 from classify_column import classify_column_path
+from canonicalize import canonical_crop
 
 METADATA = {
     "Statistical_Nepalese_Agriculture-9-45_p1_t2": dict(sector="Cereal Crops"),
     "Statistical_Nepalese_Agriculture-9-45_p1_t3": dict(sector="Cash Crops"),
-    "Statistical_Nepalese_Agriculture-9-45_p1_t4": dict(sector="Pulses"),
+    "Statistical_Nepalese_Agriculture-9-45_p1_t4": dict(
+        sector="Pulses",
+        extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p2_t5"]),
     "Statistical_Nepalese_Agriculture-9-45_p6_t12": dict(
         sector="Cereal Crops", period_default="2080/81 (2023/24)", measure_default="Production"),
     "Statistical_Nepalese_Agriculture-9-45_p7_t13": dict(
         sector="Cereal Crops", period_default="2080/81 (2023/24)",
         extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p8_t14"]),
+    # --- Pulses & Other Crops (period/measure already found in table itself) ---
+    "Statistical_Nepalese_Agriculture-9-45_p2_t6": dict(sector="Other Crops"),
+
+    # --- Millet-Barley-Buckwheat by district ---
+    "Statistical_Nepalese_Agriculture-9-45_p15_t21": dict(
+        sector="Millet-Barley-Buckwheat", period_default="2080/81 (2023/24)",
+        extra_table_ids=[
+            "Statistical_Nepalese_Agriculture-9-45_p16_t22",
+            "Statistical_Nepalese_Agriculture-9-45_p17_t23",
+        ]),
+
+    # --- Cash Crops (province grid + district breakdown, incl. oilseed subtypes) ---
+    "Statistical_Nepalese_Agriculture-9-45_p20_t25": dict(
+        sector="Major Cash Crops", period_default="2080/81 (2023/24)"),
+    "Statistical_Nepalese_Agriculture-9-45_p21_t26": dict(
+        sector="Cash Crops", period_default="2080/81 (2023/24)",
+        extra_table_ids=[
+            "Statistical_Nepalese_Agriculture-9-45_p22_t27",
+            "Statistical_Nepalese_Agriculture-9-45_p23_t28",
+        ]),
+    "Statistical_Nepalese_Agriculture-9-45_p24_t29": dict(
+        sector="Cash Crops", period_default="2080/81 (2023/24)",
+        extra_table_ids=[
+            "Statistical_Nepalese_Agriculture-9-45_p25_t30",
+            "Statistical_Nepalese_Agriculture-9-45_p26_t31",
+        ]),
+    "Statistical_Nepalese_Agriculture-9-45_p27_t32": dict(
+        sector="Cash Crops", period_default="2080/81 (2023/24)",
+        extra_table_ids=[
+            "Statistical_Nepalese_Agriculture-9-45_p28_t33",
+            "Statistical_Nepalese_Agriculture-9-45_p29_t34",
+        ]),
+
+    # --- Jute, Cotton, Tea (each own captioned sector, note Cotton's different year) ---
+    "Statistical_Nepalese_Agriculture-9-45_p30_t35": dict(
+        sector="Jute", period_default="2080/81 (2023/24)"),
+    "Statistical_Nepalese_Agriculture-9-45_p30_t36": dict(
+        sector="Cotton", period_default="2079/80 (2022/23)"),
+    "Statistical_Nepalese_Agriculture-9-45_p32_t40": dict(
+        sector="Tea", period_default="2080/81 (2023/24)"),  # normalized spacing to match the rest
 }
 
 
@@ -74,6 +117,8 @@ def normalize_generic(raw_db_path, fact_db_path):
                 crop = entity["entity_name"]
             else:
                 crop = col_qualifier
+            crop = canonical_crop(crop, known_districts=set(vocab.keys()))
+            
             if entity["entity_type"] == "row":
                 # whole-table national-level rows (e.g. crop_year_metric) -- whether
                 # it was a real crop or a "Total" label, the geography here is Nepal

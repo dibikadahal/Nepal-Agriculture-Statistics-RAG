@@ -11,7 +11,7 @@ import re
 
 MEASURE_SYNONYMS = {
     "area": "Area", "area (ha)": "Area", "ha": "Area",
-    "production": "Production", "prod (mt.)": "Production", "prod": "Production",
+    "production": "Production", "prod (mt.)": "Production", "prod": "Production", "prod.": "Production",
     "mt": "Production", "mt.": "Production",
     "yield": "Yield", "yield (mt./ha)": "Yield", "yield(kg/ha)": "Yield", "mt/ha": "Yield",
 }
