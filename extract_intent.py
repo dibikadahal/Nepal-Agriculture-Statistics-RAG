@@ -38,6 +38,7 @@ Schema:
 {{
   "intent": one of ["lookup", "superlative", "aggregate", "compare_periods"],
   "crop": crop name or null,
+  "sector": sector/group name or null,
   "place": place name or null,
   "entity_type": one of ["national", "province", "district"] or null,
   "measure": one of ["Area", "Production", "Yield"] or null,
@@ -55,6 +56,10 @@ Intent meanings:
 For "superlative" questions, entity_type is the KIND of thing being ranked
 (e.g. "which province..." -> "province", "which district..." -> "district").
 
+IMPORTANT: "crop" is a single named crop (Paddy, Maize). "sector" is a GROUP
+of crops (Cereal Crops, Cash Crops, Pulses). "total cereal production" is a
+sector question, not a crop question -- set sector="Cereal Crops", crop=null.
+
 ONLY use values from these lists. If the question mentions something not in
 these lists, put the user's original word in the field anyway -- validation
 downstream will catch it and report it properly.
@@ -62,6 +67,7 @@ downstream will catch it and report it properly.
 CROPS: {crops}
 PROVINCES: {provinces}
 DISTRICTS: {districts}
+SECTORS: {sectors}
 MEASURES: {measures}
 PERIODS: {periods}
 
@@ -72,6 +78,9 @@ Question: which province produced the most paddy in 2080/81
 
 Question: how much rice did Jhapa grow last year
 {{"intent": "lookup", "crop": "Paddy", "place": "JHAPA", "entity_type": "district", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Question: what was the total cereal production in 2080/81
+{{"intent": "aggregate", "crop": null, "sector": "Cereal Crops", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: how did wheat production change from 2078/79 to 2080/81
 {{"intent": "compare_periods", "crop": "Wheat", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "period_2": null, "direction": null}}
@@ -126,6 +135,7 @@ def extract_intent(question, vocab, model=DEFAULT_MODEL, verbose=False):
         crops=", ".join(vocab.crops),
         provinces=", ".join(vocab.provinces),
         districts=", ".join(vocab.districts),
+        sectors=", ".join(vocab.sectors),
         measures=", ".join(vocab.measures),
         periods=", ".join(vocab.periods),
     )
@@ -177,6 +187,18 @@ def validate_intent(intent, vocab, verbose=False):
         if etype and etype not in vocab.entity_types:
             raise IntentError(f"Unknown entity_type {etype!r}; expected one of {vocab.entity_types}")
         out["entity_type"] = etype
+
+    sector = intent.get("sector")
+    if sector:
+        matched, how = vocab.match_sector(sector)
+        if not matched:
+            raise IntentError(
+                f"Unknown sector {sector!r}. Available: {vocab.sectors}")
+        if verbose and how != "exact":
+            print(f"[validate] sector: {how}")
+        out["sector"] = matched
+    else:
+        out["sector"] = None
 
     measure = intent.get("measure")
     if measure:

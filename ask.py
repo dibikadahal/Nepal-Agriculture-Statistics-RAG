@@ -56,14 +56,26 @@ try:
     except sqlite3.Error:
         pass
 
-    print("\nSource:")
-    for tid in sources:
-        if tid in pages:
-            page, caption = pages[tid]
-            label = f" -- {caption}" if caption else ""
-            print(f"  page {page}: {tid}{label}")
-        else:
-            print(f"  {tid}")
+    # Cite ONE primary source -- the table the top row actually came from --
+    # rather than every table that happens to contain the same figure. Listing
+    # five sources for one number makes checking harder, not easier. Other
+    # tables carrying the same value are reported as corroboration.
+    primary_tid = rows[0]["source_table_id"]
+    others = [t for t in sources if t != primary_tid]
+
+    if primary_tid in pages:
+        page, caption = pages[primary_tid]
+        label = f" -- {caption}" if caption else ""
+        print(f"\nSource: page {page} ({primary_tid}){label}")
+    else:
+        print(f"\nSource: {primary_tid}")
+
+    if others:
+        other_pages = sorted({pages[t][0] for t in others if t in pages})
+        if other_pages:
+            plural = "s" if len(other_pages) > 1 else ""
+            print(f"Same figure also appears on page{plural} "
+                  f"{', '.join(str(p) for p in other_pages)}.")
 
 except IntentError as e:
     print(f"Could not understand the question: {e}")

@@ -87,16 +87,27 @@ def q_aggregate(conn, intent, period):
     scope = intent.get("entity_type") or "national"
     if intent["crop"]:
         sql = f"""
-            SELECT entity_name, crop, measure, period, value_num, source_table_id
+            SELECT entity_name, crop, sector, measure, period, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ? AND period = ? AND crop = ? AND entity_type = ?
               AND geo_is_total = 1
             ORDER BY value_num DESC LIMIT 5
         """
         rows = conn.execute(sql, [intent["measure"], period, intent["crop"], scope]).fetchall()
+    elif intent.get("sector"):
+        # a sector total ("all cereal crops") -- the stated all-crops total row
+        # within tables belonging to that sector
+        sql = f"""
+            SELECT entity_name, crop, sector, measure, period, value_num, source_table_id
+            FROM {TABLE}
+            WHERE measure = ? AND period = ? AND entity_type = ? AND sector = ?
+              AND crop_is_total = 1 AND geo_is_total = 1
+            ORDER BY value_num DESC LIMIT 5
+        """
+        rows = conn.execute(sql, [intent["measure"], period, scope, intent["sector"]]).fetchall()
     else:
         sql = f"""
-            SELECT entity_name, crop, measure, period, value_num, source_table_id
+            SELECT entity_name, crop, sector, measure, period, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ? AND period = ? AND entity_type = ?
               AND crop_is_total = 1 AND geo_is_total = 1
