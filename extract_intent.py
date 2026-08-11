@@ -83,15 +83,19 @@ class IntentError(Exception):
     pass
 
 
-def call_ollama(prompt, system, model=DEFAULT_MODEL, timeout=120):
+def call_ollama(prompt, system, model=DEFAULT_MODEL, timeout=120, as_json=True):
+    """as_json=True constrains output to valid JSON (used for intent extraction).
+    Set as_json=False for prose answers -- forcing JSON mode there makes the
+    model emit an empty object instead of a sentence."""
     payload = {
         "model": model,
         "prompt": prompt,
         "system": system,
         "stream": False,
-        "format": "json",       # ollama's JSON mode -- constrains output
-        "options": {"temperature": 0},   # deterministic: same question -> same intent
+        "options": {"temperature": 0},   # deterministic: same question -> same output
     }
+    if as_json:
+        payload["format"] = "json"       # ollama's JSON mode -- constrains output
     req = urllib.request.Request(
         OLLAMA_URL,
         data=json.dumps(payload).encode(),
