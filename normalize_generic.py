@@ -67,6 +67,38 @@ METADATA = {
 
     "Statistical_Nepalese_Agriculture-9-45_p3_t10": dict(
         sector="Fertilizer", measure_default="Sales"),
+
+    "Statistical_Nepalese_Agriculture-9-45_p9_t15": dict(
+        sector="Paddy by District",
+        extra_table_ids=[
+            "Statistical_Nepalese_Agriculture-9-45_p10_t16",
+            "Statistical_Nepalese_Agriculture-9-45_p11_t17",
+            "Statistical_Nepalese_Agriculture-9-45_p12_t18",
+        ],
+        crop_map={
+            "Early Paddy": "Early Paddy",
+            "Main Paddy": "Main Paddy",
+            "Total Paddy": "Paddy",     # the headline figure people mean by "paddy"
+            "": "Main Paddy",           # unlabelled middle column is Main Paddy
+            "__default__": "Paddy",
+        }),
+
+        # --- Livestock (page 2-3): category x year, headcounts and product output ---
+    "Statistical_Nepalese_Agriculture-9-45_p2_t7": dict(
+        sector="Livestock", measure_default="Population"),
+    "Statistical_Nepalese_Agriculture-9-45_p2_t8": dict(
+        sector="Livestock Products", measure_default="Production",
+        extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p3_t9"]),
+
+    # --- Maize & Wheat by district (pages 13-14, one table split across pages) ---
+    "Statistical_Nepalese_Agriculture-9-45_p13_t19": dict(
+        sector="Maize and Wheat", period_default="2080/81 (2023/24)",
+        extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p14_t20"]),
+
+
+    # --- Cotton continuation (page 30) ---
+    "Statistical_Nepalese_Agriculture-9-45_p30_t37": dict(
+        sector="Cotton", period_default="2079/80 (2022/23)"),
 }
 
 
@@ -121,6 +153,9 @@ def normalize_generic(raw_db_path, fact_db_path):
             else:
                 crop = col_qualifier
             crop = canonical_crop(crop, known_districts=set(vocab.keys()))
+            crop_map = meta.get("crop_map")
+            if crop_map:
+                crop = crop_map.get(crop or "", crop_map.get("__default__", crop))
             
             if entity["entity_type"] == "row":
                 # whole-table national-level rows (e.g. crop_year_metric) -- whether
