@@ -16,6 +16,11 @@ ANSWER_SYSTEM = """You write one or two plain sentences answering a question abo
 
 You are given the exact figures retrieved from a database. Rules:
 - Use ONLY the numbers given to you. Never compute, adjust, round differently, or invent a figure.
+- Describe each figure EXACTLY as it is labelled. If a figure is labelled
+  "all crops combined", it is a total across every item -- do NOT attribute it
+  to whichever single item the question mentioned. If the question asked about
+  one item but the figure given is a combined total, say so plainly instead of
+  presenting the total as that item's value.
 - Include units: production is metric tonnes, area is hectares, yield is metric tonnes per hectare.
 - If the answer covers a fiscal year, name it.
 - Be direct. No preamble, no bullet points, no restating the question.

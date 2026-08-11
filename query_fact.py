@@ -61,11 +61,41 @@ def q_lookup(conn, intent, period):
 
 
 def q_superlative(conn, intent, period):
-    """Highest/lowest across entities of one type. Excludes stated total
-    rows so the Nepal row never outranks the provinces it sums."""
+    """Two kinds of superlative, distinguished by what's being ranked:
+
+    1. Ranking ITEMS within a sector -- "which fertilizer sold most",
+       "which cereal crop had the highest production". Signalled by a sector
+       with no specific crop. Ranks crops, excluding the sector's own total row.
+
+    2. Ranking PLACES -- "which province produced the most paddy". Ranks
+       provinces or districts, excluding stated geographic total rows so the
+       Nepal row never outranks the provinces it sums.
+    """
     direction = "DESC" if intent.get("direction", "max") == "max" else "ASC"
+
+    # case 1: rank items within a sector
+    if intent.get("sector") and not intent.get("crop"):
+        sql = f"""
+            SELECT entity_name, entity_path, crop, sector, measure, period,
+                   value_num, source_table_id
+            FROM {TABLE}
+            WHERE measure = ?
+              AND period = ?
+              AND sector = ?
+              AND crop IS NOT NULL
+              AND crop_is_total = 0
+            ORDER BY value_num {direction}
+            LIMIT 5
+        """
+        rows = conn.execute(sql, [intent["measure"], period, intent["sector"]]).fetchall()
+        if rows:
+            return rows
+        # fall through to place-ranking if the sector had no rankable items
+
+    # case 2: rank places
     sql = f"""
-        SELECT entity_name, entity_path, crop, measure, period, value_num, source_table_id
+        SELECT entity_name, entity_path, crop, sector, measure, period,
+               value_num, source_table_id
         FROM {TABLE}
         WHERE measure = ?
           AND period = ?

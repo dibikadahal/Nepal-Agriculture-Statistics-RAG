@@ -64,6 +64,9 @@ METADATA = {
         sector="Cotton", period_default="2079/80 (2022/23)"),
     "Statistical_Nepalese_Agriculture-9-45_p32_t40": dict(
         sector="Tea", period_default="2080/81 (2023/24)"),  # normalized spacing to match the rest
+
+    "Statistical_Nepalese_Agriculture-9-45_p3_t10": dict(
+        sector="Fertilizer", measure_default="Sales"),
 }
 
 

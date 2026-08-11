@@ -37,7 +37,7 @@ Return ONLY a JSON object. No prose, no markdown fences, no explanation.
 Schema:
 {{
   "intent": one of ["lookup", "superlative", "aggregate", "compare_periods"],
-  "crop": crop name or null,
+  "crop": commodity name (crop, fertilizer type, livestock product, etc.) or null,
   "sector": sector/group name or null,
   "place": place name or null,
   "entity_type": one of ["national", "province", "district"] or null,
@@ -56,9 +56,17 @@ Intent meanings:
 For "superlative" questions, entity_type is the KIND of thing being ranked
 (e.g. "which province..." -> "province", "which district..." -> "district").
 
-IMPORTANT: "crop" is a single named crop (Paddy, Maize). "sector" is a GROUP
-of crops (Cereal Crops, Cash Crops, Pulses). "total cereal production" is a
-sector question, not a crop question -- set sector="Cereal Crops", crop=null.
+IMPORTANT: "crop" means any single named COMMODITY in the CROPS list below --
+not only plants. Fertilizer types (Urea, DAP, Potash) and other commodities
+appear in that list and belong in the "crop" field. If the question names an
+item that appears in CROPS, put it there.
+
+"sector" is a GROUP (Cereal Crops, Cash Crops, Pulses, Fertilizer). Use it for
+questions about a whole group, with crop=null. "total cereal production" is a
+sector question; "how much urea" is a crop question (crop="Urea").
+
+Leaving crop=null means "the total across all items" -- only do that when the
+question really asks for a total.
 
 ONLY use values from these lists. If the question mentions something not in
 these lists, put the user's original word in the field anyway -- validation
@@ -81,6 +89,9 @@ Question: how much rice did Jhapa grow last year
 
 Question: what was the total cereal production in 2080/81
 {{"intent": "aggregate", "crop": null, "sector": "Cereal Crops", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Question: how much urea was sold in 2080/81
+{{"intent": "lookup", "crop": "Urea", "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Sales", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: how did wheat production change from 2078/79 to 2080/81
 {{"intent": "compare_periods", "crop": "Wheat", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "period_2": null, "direction": null}}
