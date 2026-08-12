@@ -13,7 +13,6 @@ model.
 from extract_intent import call_ollama
 
 ANSWER_SYSTEM = """You write one or two plain sentences answering a question about Nepali agriculture statistics.
-Use exactly the unit shown for each figure. Do not assume the answer of your own.
 
 You are given the exact figures retrieved from a database. Rules:
 - Use ONLY the numbers given to you. Never compute, adjust, round differently, or invent a figure.
@@ -22,9 +21,13 @@ You are given the exact figures retrieved from a database. Rules:
   to whichever single item the question mentioned. If the question asked about
   one item but the figure given is a combined total, say so plainly instead of
   presenting the total as that item's value.
-- Include units: production is metric tonnes, area is hectares, yield is metric tonnes per hectare.
 - If the answer covers a fiscal year, name it.
 - Be direct. No preamble, no bullet points, no restating the question.
+- Use exactly the unit shown next to a figure. Only when NO unit is shown next to a figure, fall back to: production = metric tonnes, area = hectares, yield = metric tonnes per hectare. Never say metric tonnes when a different unit is given.
+- - The label on each figure is authoritative. If the question asks about
+  something and the retrieved figure is labelled differently, say what the
+  figure actually is. Never restate a figure using the question's wording
+  when the label differs.
 """
 
 
@@ -50,9 +53,11 @@ def format_rows(rows, meta):
             continue
         seen.add(key)
         crop = r["crop"] or "all crops combined"
+        unit = r["unit"] if "unit" in r.keys() else None
+        unit_str = f" {unit}" if unit else ""
         lines.append(
             f"- {r['entity_name']}: {crop}, {r['measure']} = "
-            f"{format_value(r['value_num'])} ({r['period']})"
+            f"{format_value(r['value_num'])}{unit_str} ({r['period']})"
         )
 
     if meta.get("kind") == "compare_periods":
