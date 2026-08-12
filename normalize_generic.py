@@ -59,13 +59,18 @@ METADATA = {
 
     # --- Jute, Cotton, Tea (each own captioned sector, note Cotton's different year) ---
     "Statistical_Nepalese_Agriculture-9-45_p30_t35": dict(
-        sector="Jute", period_default="2080/81 (2023/24)"),
+        sector="Jute", period_default="2080/81 (2023/24)",
+        crop_map={"__default__": "Jute"}),
     "Statistical_Nepalese_Agriculture-9-45_p30_t36": dict(
-        sector="Cotton", period_default="2079/80 (2022/23)"),
+        sector="Cotton", period_default="2079/80 (2022/23)",
+        crop_map={"__default__": "Cotton"}),
+    "Statistical_Nepalese_Agriculture-9-45_p30_t37": dict(
+        sector="Cotton", period_default="2079/80 (2022/23)",
+        crop_map={"__default__": "Cotton"}),
+
     "Statistical_Nepalese_Agriculture-9-45_p32_t40": dict(
         sector="Tea", period_default="2080/81 (2023/24)",
         measure_default="Production",
-        units={"Production": "kilograms", "Area": "hectares"},
         crop_map={
             "CTC Production (Kg)": "Tea (CTC)",
             "Orthodox Production (Kg)": "Tea (Orthodox)",
@@ -77,7 +82,29 @@ METADATA = {
             "Small Farmers(No. )": "Tea Small Farmers",
             "Small Farmers Area (ha)": "Tea Smallholder Area",
             "Total Production Area (ha)": "Tea Area",
-        }),  # normalized spacing to match the rest
+        },
+        # Every column in this table was landing as measure="Production" because
+        # of measure_default -- so "how many tea estates" asked for a Count that
+        # didn't exist. The measure varies by column here, not by table.
+        measure_by_crop={
+            "Tea Estates": "Count",
+            "Tea Small Farmers": "Count",
+            "Tea Estate Area": "Area",
+            "Tea Smallholder Area": "Area",
+            "Tea Area": "Area",
+        },
+        units_by_crop={
+            "Tea": "kilograms",
+            "Tea (CTC)": "kilograms",
+            "Tea (Orthodox)": "kilograms",
+            "Tea (Green)": "kilograms",
+            "Tea (Other)": "kilograms",
+            "Tea Estate Area": "hectares",
+            "Tea Smallholder Area": "hectares",
+            "Tea Area": "hectares",
+            "Tea Estates": "estates",
+            "Tea Small Farmers": "farmers",
+        }),# normalized spacing to match the rest
 
     "Statistical_Nepalese_Agriculture-9-45_p3_t10": dict(
         sector="Fertilizer", measure_default="Sales"),
@@ -103,17 +130,42 @@ METADATA = {
         units={"Population": "animals"}),
     "Statistical_Nepalese_Agriculture-9-45_p2_t8": dict(
         sector="Livestock Products", measure_default="Production",
-        extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p3_t9"]),
+        extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p3_t9"],
+        # The source uses a leading dash as a visual indent for components
+        # ("- HEN EGG" under "EGG PRODUCTION"), with nothing structural marking
+        # the parent as a total. Without distinct names, "how many eggs" landed
+        # on the total in one year and on hen eggs in another, purely by fuzzy
+        # matching. Clean names make it deterministic.
+        crop_map={
+            "MILK PRODUCTION (Mt.)": "Milk",
+            "- COW MILK": "Cow Milk",
+            "- BUFF. MILK": "Buffalo Milk",
+            "MEAT (NET) PRODUCTION (Mt.)": "Meat",
+            "- BUFF": "Buffalo Meat",
+            "- MUTTON (Sheep)": "Mutton",
+            "- CHEVON": "Chevon",
+            "- PORK": "Pork",
+            "- CHICKEN": "Chicken Meat",
+            "- DUCK": "Duck Meat",
+            "EGG PRODUCTION ('000 Number)": "Eggs",
+            "- HEN EGG": "Hen Eggs",
+            "- DUCK EGG": "Duck Eggs",
+            "WOOL PRODUCTION(Kg.)": "Wool",
+        },
+        # Three different units in one table, all under measure="Production",
+        # so a measure-keyed units dict can't distinguish them.
+        units_by_crop={
+            "Eggs": "thousand eggs",
+            "Hen Eggs": "thousand eggs",
+            "Duck Eggs": "thousand eggs",
+            "Wool": "kilograms",
+        }),
 
     # --- Maize & Wheat by district (pages 13-14, one table split across pages) ---
     "Statistical_Nepalese_Agriculture-9-45_p13_t19": dict(
         sector="Cereal Crops by District", period_default="2080/81 (2023/24)",
         extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p14_t20"]),
 
-
-    # --- Cotton continuation (page 30) ---
-    "Statistical_Nepalese_Agriculture-9-45_p30_t37": dict(
-        sector="Cotton", period_default="2079/80 (2022/23)"),
 }
 
 
@@ -184,8 +236,11 @@ def normalize_generic(raw_db_path, fact_db_path):
             table_rows.append(dict(
                 entity_type=entity["entity_type"], entity_name=entity["entity_name"],
                 entity_path=entity["entity_path"], crop=crop, sector=meta["sector"],
-                measure=col["measure"] or meta.get("measure_default"),
-                unit=meta.get("units", {}).get(col["measure"] or meta.get("measure_default"), None),
+                measure=(meta.get("measure_by_crop", {}).get(crop)
+                         or col["measure"] or meta.get("measure_default")),
+                unit=(meta.get("units_by_crop", {}).get(crop)
+                      or meta.get("units", {}).get(
+                          col["measure"] or meta.get("measure_default"))),
                 period=col["period"] or meta.get("period_default"),
                 value_num=m["value"], source_table_id=table_id,
             ))
