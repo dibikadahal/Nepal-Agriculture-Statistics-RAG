@@ -63,6 +63,12 @@ products (MILK PRODUCTION, EGG PRODUCTION, WOOL PRODUCTION). If the question
 names anything that appears in CROPS -- however it is phrased -- put it in the
 "crop" field. Match case-insensitively; the list may use capitals.
 
+If the question names something that is NOT in the CROPS list, put the user's
+original wording in the "crop" field anyway -- do NOT substitute the closest
+listed item. "yak milk" is not "Milk"; "goat milk" is not "Milk". Validation
+downstream will reject unknown items and tell the user. Silently answering
+with a different item than the one asked about is the worst possible outcome.
+
 Questions like "how many cattle were there" or "how many goats are there" are
 asking about a listed item: crop="CATTLE" / "GOAT", measure="Population".
 
@@ -123,6 +129,22 @@ Question: how much urea was sold in 2080/81
 
 Question: how did wheat production change from 2078/79 to 2080/81
 {{"intent": "compare_periods", "crop": "Wheat", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Some items are counts rather than quantities: "Tea Estates" and "Tea Small
+Farmers" use measure="Count". Livestock animals use measure="Population".
+Do not confuse the two -- Population is only for the animals in the Livestock
+sector.
+
+Question: which district has the most tea estates
+{{"intent": "superlative", "crop": "Tea Estates", "sector": null, "place": null, "entity_type": "district", "measure": "Count", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
+
+Measures vary by what is being counted. "Count" is for numbers of things
+(Tea Estates, Tea Small Farmers). "Population" is ONLY for livestock animals
+(cattle, goats, buffaloes). "Sales" is for fertilizer. Do not use Population
+for anything outside the Livestock sector.
+
+Question: which district has the most tea estates
+{{"intent": "superlative", "crop": "Tea Estates", "sector": null, "place": null, "entity_type": "district", "measure": "Count", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
 """
 
 
@@ -226,6 +248,11 @@ def validate_intent(intent, vocab, verbose=False):
         if etype and etype not in vocab.entity_types:
             raise IntentError(f"Unknown entity_type {etype!r}; expected one of {vocab.entity_types}")
         out["entity_type"] = etype
+
+      # The model fills "place" inconsistently -- it wrote "Nepal" for hen eggs
+    # but left it empty for duck eggs. A national question always means Nepal.
+    if not out["place"] and out.get("entity_type") == "national":
+        out["place"] = "Nepal"
 
     sector = intent.get("sector")
     if sector:
