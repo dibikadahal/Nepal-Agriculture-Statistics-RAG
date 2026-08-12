@@ -45,16 +45,20 @@ def _connect(db_path):
 
 def q_lookup(conn, intent, period):
     """A single value: this crop, this place, this measure, this period."""
+    has_place = bool(intent.get("place"))
     sql = f"""
-        SELECT entity_name, entity_path, crop, measure, period, value_num, source_table_id
+        SELECT entity_name, entity_path, crop, sector, measure, period, unit,
+               value_num, source_table_id
         FROM {TABLE}
         WHERE measure = ?
           AND period = ?
-          AND entity_name = ?
+          AND {'entity_name = ?' if has_place else 'entity_type = "national"'}
           AND {'crop = ?' if intent['crop'] else 'crop_is_total = 1'}
         ORDER BY value_num DESC
     """
-    params = [intent["measure"], period, intent["place"]]
+    params = [intent["measure"], period]
+    if has_place:
+        params.append(intent["place"])
     if intent["crop"]:
         params.append(intent["crop"])
     return conn.execute(sql, params).fetchall()
@@ -86,7 +90,7 @@ def q_superlative(conn, intent, period):
         # ascending ranking.
         sql = f"""
             SELECT entity_name, entity_path, crop, sector, measure, period,
-                   value_num, source_table_id
+                   unit, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ?
               AND period = ?
@@ -110,7 +114,7 @@ def q_superlative(conn, intent, period):
     # case 2: rank places
     sql = f"""
         SELECT entity_name, entity_path, crop, sector, measure, period,
-               value_num, source_table_id
+               unit, value_num, source_table_id
         FROM {TABLE}
         WHERE measure = ?
           AND period = ?
@@ -134,7 +138,7 @@ def q_aggregate(conn, intent, period):
     # not the cereal sector, even when the model fills in both fields.
     if intent["crop"]:
         sql = f"""
-            SELECT entity_name, crop, sector, measure, period, value_num, source_table_id
+            SELECT entity_name, crop, sector, measure, period, unit, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ? AND period = ? AND crop = ? AND entity_type = ?
               AND geo_is_total = 1
@@ -145,7 +149,7 @@ def q_aggregate(conn, intent, period):
         # a sector total ("all cereal crops") -- the stated all-crops total row
         # within tables belonging to that sector
         sql = f"""
-            SELECT entity_name, crop, sector, measure, period, value_num, source_table_id
+            SELECT entity_name, crop, sector, measure, period, unit, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ? AND period = ? AND entity_type = ? AND sector = ?
               AND crop_is_total = 1 AND geo_is_total = 1
@@ -154,7 +158,7 @@ def q_aggregate(conn, intent, period):
         rows = conn.execute(sql, [intent["measure"], period, scope, intent["sector"]]).fetchall()
     else:
         sql = f"""
-            SELECT entity_name, crop, sector, measure, period, value_num, source_table_id
+            SELECT entity_name, crop, sector, measure, period, unit, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ? AND period = ? AND entity_type = ?
               AND crop_is_total = 1 AND geo_is_total = 1
@@ -169,7 +173,7 @@ def q_compare_periods(conn, intent):
     than a self-join -- simpler, and no ambiguous-column class of bug."""
     def one(period):
         sql = f"""
-            SELECT entity_name, crop, measure, period, value_num, source_table_id
+            SELECT entity_name, crop, measure, period, unit, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ? AND period = ?
               AND {'crop = ?' if intent['crop'] else 'crop_is_total = 1'}
