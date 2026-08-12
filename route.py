@@ -15,9 +15,16 @@ ROUTE_SYSTEM = """You classify questions about a Nepali agriculture statistics r
 Return ONLY JSON: {"route": "numeric"} or {"route": "prose"}
 
 "numeric" -- the answer is a figure from a statistics table: production,
-area, yield, totals, rankings, changes between years.
+area, yield, population counts, sales, totals, rankings, changes between years.
+This covers crops, livestock, fertilizer -- anything counted or measured.
 Examples: "which province produced the most paddy", "total cereal production
-in 2080/81", "how did wheat production change", "how much maize did Bagmati grow"
+in 2080/81", "how did wheat production change", "how much maize did Bagmati grow",
+"how many cattle were there in 2080/81", "which livestock category had the
+highest population", "how much urea was sold", "which fertilizer sold the most"
+
+Words like "category", "type", or "kind" do NOT make a question prose -- 
+"which livestock category had the highest population" is still a ranking
+from a table, so it is numeric.
 
 "prose" -- the answer is explanatory text: definitions, methodology, notes,
 commentary, what the report says about something.

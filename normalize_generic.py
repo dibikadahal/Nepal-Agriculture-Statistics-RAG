@@ -63,7 +63,21 @@ METADATA = {
     "Statistical_Nepalese_Agriculture-9-45_p30_t36": dict(
         sector="Cotton", period_default="2079/80 (2022/23)"),
     "Statistical_Nepalese_Agriculture-9-45_p32_t40": dict(
-        sector="Tea", period_default="2080/81 (2023/24)"),  # normalized spacing to match the rest
+        sector="Tea", period_default="2080/81 (2023/24)",
+        measure_default="Production",
+        units={"Production": "kilograms", "Area": "hectares"},
+        crop_map={
+            "CTC Production (Kg)": "Tea (CTC)",
+            "Orthodox Production (Kg)": "Tea (Orthodox)",
+            "Green Tea Production (Kg)": "Tea (Green)",
+            "Other Production (Kg)": "Tea (Other)",
+            "Production Total (Kg)": "Tea",
+            "No. of Estates": "Tea Estates",
+            "Estate Plantation Area (ha)": "Tea Estate Area",
+            "Small Farmers(No. )": "Tea Small Farmers",
+            "Small Farmers Area (ha)": "Tea Smallholder Area",
+            "Total Production Area (ha)": "Tea Area",
+        }),  # normalized spacing to match the rest
 
     "Statistical_Nepalese_Agriculture-9-45_p3_t10": dict(
         sector="Fertilizer", measure_default="Sales"),
@@ -85,14 +99,15 @@ METADATA = {
 
         # --- Livestock (page 2-3): category x year, headcounts and product output ---
     "Statistical_Nepalese_Agriculture-9-45_p2_t7": dict(
-        sector="Livestock", measure_default="Population"),
+        sector="Livestock", measure_default="Population",
+        units={"Population": "animals"}),
     "Statistical_Nepalese_Agriculture-9-45_p2_t8": dict(
         sector="Livestock Products", measure_default="Production",
         extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p3_t9"]),
 
     # --- Maize & Wheat by district (pages 13-14, one table split across pages) ---
     "Statistical_Nepalese_Agriculture-9-45_p13_t19": dict(
-        sector="Maize and Wheat", period_default="2080/81 (2023/24)",
+        sector="Cereal Crops by District", period_default="2080/81 (2023/24)",
         extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p14_t20"]),
 
 
@@ -108,7 +123,7 @@ def normalize_generic(raw_db_path, fact_db_path):
     fact_conn.execute("""CREATE TABLE IF NOT EXISTS fact_generic (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         entity_type TEXT, entity_name TEXT, entity_path TEXT,
-        crop TEXT, sector TEXT, measure TEXT, period TEXT,
+        crop TEXT, sector TEXT, measure TEXT, period TEXT, unit TEXT,
         value_num REAL, geo_is_total INTEGER, crop_is_total INTEGER,
         source_table_id TEXT, extracted_at TEXT
     )""")
@@ -146,16 +161,21 @@ def normalize_generic(raw_db_path, fact_db_path):
             is_total_label = entity["entity_type"] == "row" and entity["entity_name"].strip().lower() in TOTAL_LABELS
             col_qualifier = col["qualifiers"][0] if col["qualifiers"] else None
             col_is_total = col_qualifier is not None and col_qualifier.strip().lower() in TOTAL_LABELS
-            if is_total_label or col_is_total:
-                crop = None
+            if col_is_total:
+                crop = None                      # the column itself is a total
+            elif is_total_label and not col_qualifier:
+                crop = None                      # row total, and no crop in the column
             elif entity["entity_type"] == "row":
                 crop = entity["entity_name"]
             else:
-                crop = col_qualifier
-            crop = canonical_crop(crop, known_districts=set(vocab.keys()))
+                crop = col_qualifier             
             crop_map = meta.get("crop_map")
-            if crop_map:
-                crop = crop_map.get(crop or "", crop_map.get("__default__", crop))
+            if crop_map and crop in crop_map:
+                crop = crop_map[crop]          # explicit mapping wins, skip canonicalization
+            else:
+                crop = canonical_crop(crop, known_districts=set(vocab.keys()))
+                if crop_map:
+                    crop = crop_map.get(crop or "", crop_map.get("__default__", crop))
             
             if entity["entity_type"] == "row":
                 # whole-table national-level rows (e.g. crop_year_metric) -- whether
@@ -165,6 +185,7 @@ def normalize_generic(raw_db_path, fact_db_path):
                 entity_type=entity["entity_type"], entity_name=entity["entity_name"],
                 entity_path=entity["entity_path"], crop=crop, sector=meta["sector"],
                 measure=col["measure"] or meta.get("measure_default"),
+                unit=meta.get("units", {}).get(col["measure"] or meta.get("measure_default"), None),
                 period=col["period"] or meta.get("period_default"),
                 value_num=m["value"], source_table_id=table_id,
             ))
@@ -179,11 +200,11 @@ def normalize_generic(raw_db_path, fact_db_path):
     for f in all_facts:
         fact_conn.execute(
             """INSERT INTO fact_generic (entity_type, entity_name, entity_path, crop, sector,
-               measure, period, value_num, geo_is_total, crop_is_total, source_table_id, extracted_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+               measure, period, unit, value_num, geo_is_total, crop_is_total, source_table_id, extracted_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (f["entity_type"], f["entity_name"], f["entity_path"], f["crop"], f["sector"],
-             f["measure"], f["period"], f["value_num"], int(f["geo_is_total"]), int(f["crop_is_total"]),
-             f["source_table_id"], now))
+             f["measure"], f["period"], f["unit"], f["value_num"], int(f["geo_is_total"]),
+             int(f["crop_is_total"]), f["source_table_id"], now))
     fact_conn.commit()
     print(f"\nTotal: {len(all_facts)} fact rows written to fact_generic")
 

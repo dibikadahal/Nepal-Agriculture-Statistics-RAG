@@ -56,14 +56,33 @@ Intent meanings:
 For "superlative" questions, entity_type is the KIND of thing being ranked
 (e.g. "which province..." -> "province", "which district..." -> "district").
 
-IMPORTANT: "crop" means any single named COMMODITY in the CROPS list below --
-not only plants. Fertilizer types (Urea, DAP, Potash) and other commodities
-appear in that list and belong in the "crop" field. If the question names an
-item that appears in CROPS, put it there.
+IMPORTANT: "crop" means any single named ITEM in the CROPS list below -- not
+only plants. That list also contains fertilizer types (Urea, DAP, Potash),
+livestock (CATTLE, BUFFALOES, GOAT, SHEEP, PIGS, FOWL, DUCK), and livestock
+products (MILK PRODUCTION, EGG PRODUCTION, WOOL PRODUCTION). If the question
+names anything that appears in CROPS -- however it is phrased -- put it in the
+"crop" field. Match case-insensitively; the list may use capitals.
 
-"sector" is a GROUP (Cereal Crops, Cash Crops, Pulses, Fertilizer). Use it for
-questions about a whole group, with crop=null. "total cereal production" is a
-sector question; "how much urea" is a crop question (crop="Urea").
+Questions like "how many cattle were there" or "how many goats are there" are
+asking about a listed item: crop="CATTLE" / "GOAT", measure="Population".
+
+"sector" is a GROUP -- see the SECTORS list below (Cereal Crops, Cash Crops,
+Pulses, Fertilizer, Livestock, and others). Use it for questions about a whole
+group, with crop=null. "total cereal production" is a sector question; "how much
+urea" is a crop question (crop="Urea").
+
+When a question asks WHICH ITEM within a group ranks highest or lowest, set
+sector to that group and leave crop null:
+  "which fertilizer sold the most"           -> sector="Fertilizer", crop=null
+  "which livestock category has the most"    -> sector="Livestock", crop=null
+  "which cereal crop had the highest yield"  -> sector="Cereal Crops", crop=null
+Words like "category", "type", or "kind" signal a sector-level ranking.
+
+CRITICAL: if a term appears in the CROPS list, it goes in "crop" -- never in
+"sector", even if a sector name happens to contain the same word. "Wheat" is a
+crop, so "total wheat area" is crop="Wheat", sector=null, despite there being a
+sector called "Maize and Wheat". Only use "sector" when the question names a
+GROUP that is not itself a single item in CROPS.
 
 Leaving crop=null means "the total across all items" -- only do that when the
 question really asks for a total.
@@ -89,6 +108,15 @@ Question: how much rice did Jhapa grow last year
 
 Question: what was the total cereal production in 2080/81
 {{"intent": "aggregate", "crop": null, "sector": "Cereal Crops", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Question: what was the total wheat area in Nepal in 2080/81
+{{"intent": "aggregate", "crop": "Wheat", "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Area", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Question: which livestock category had the highest population in 2080/81
+{{"intent": "superlative", "crop": null, "sector": "Livestock", "place": "Nepal", "entity_type": "national", "measure": "Population", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
+
+Question: how many cattle were there in 2080/81
+{{"intent": "lookup", "crop": "CATTLE", "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Population", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: how much urea was sold in 2080/81
 {{"intent": "lookup", "crop": "Urea", "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Sales", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
@@ -203,8 +231,19 @@ def validate_intent(intent, vocab, verbose=False):
     if sector:
         matched, how = vocab.match_sector(sector)
         if not matched:
-            raise IntentError(
-                f"Unknown sector {sector!r}. Available: {vocab.sectors}")
+            # The model sometimes puts a CROP in the sector slot (e.g. "Wheat",
+            # nudged by a sector literally named "Maize and Wheat"). Recover
+            # silently rather than rejecting a perfectly answerable question.
+            as_crop, _ = vocab.match_crop(sector)
+            if as_crop and not out.get("crop"):
+                if verbose:
+                    print(f"[validate] sector {sector!r} is a crop -- moved to crop")
+                out["crop"] = as_crop
+                out["sector"] = None
+                matched = None
+            else:
+                raise IntentError(
+                    f"Unknown sector {sector!r}. Available: {vocab.sectors}")
         if verbose and how != "exact":
             print(f"[validate] sector: {how}")
         out["sector"] = matched

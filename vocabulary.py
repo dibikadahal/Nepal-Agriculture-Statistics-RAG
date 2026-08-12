@@ -23,6 +23,7 @@ deterministic, instant, and dependency-free. (If real-world questions
 later show semantic misses -- "cereal grains" for the Cereal Crops
 sector -- that's the point to add embeddings, not before.)
 """
+import re
 import sqlite3
 from difflib import get_close_matches
 
@@ -33,6 +34,16 @@ ALIASES = {
     "spud": "Potato", "potatoes": "Potato",
     "oilseed": "Oilseeds", "mustard": "Rapeseed",
     "output": "Production", "produced": "Production", "yield per hectare": "Yield",
+    # livestock: singular/plural and common phrasing -> the stored label
+    "cattle": "CATTLE", "cow": "CATTLE", "cows": "CATTLE",
+    "buffalo": "BUFFALOES", "buffaloes": "BUFFALOES", "buffalos": "BUFFALOES",
+    "goat": "GOAT", "goats": "GOAT",
+    "sheep": "SHEEP", "pig": "PIGS", "pigs": "PIGS",
+    "chicken": "FOWL", "chickens": "FOWL", "fowl": "FOWL",
+    "duck": "DUCK", "ducks": "DUCK",
+    "population": "Population", "headcount": "Population",
+    "how many": "Population", "number": "Population",
+    "sold": "Sales", "sales": "Sales",
     "acreage": "Area", "land": "Area", "hectares": "Area",
     "nepal": "Nepal", "national": "Nepal", "whole country": "Nepal",
 }
@@ -101,7 +112,14 @@ class Vocabulary:
         return self._match(term, self.sectors, ALIASES)
 
     def match_place(self, term):
-        """Returns (name, entity_type, how). Checks national -> province -> district."""
+        """Returns (name, entity_type, how). Checks national -> province -> district.
+
+        Strips trailing "province"/"district" first: the model often returns
+        "Madhesh Province", which fuzzy-matched to MAHOTTARI instead of Madhesh
+        because the extra word dominated the comparison."""
+        if term:
+            term = re.sub(r"\s*(province|pradesh|district|zone)\s*$", "",
+                          term.strip(), flags=re.IGNORECASE).strip()
         if term and term.strip().lower() in ("nepal", "national", "whole country", "n e p a l"):
             return "Nepal", "national", "exact"
         name, how = self._match(term, self.provinces, ALIASES)

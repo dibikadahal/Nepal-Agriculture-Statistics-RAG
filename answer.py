@@ -13,6 +13,7 @@ model.
 from extract_intent import call_ollama
 
 ANSWER_SYSTEM = """You write one or two plain sentences answering a question about Nepali agriculture statistics.
+Use exactly the unit shown for each figure. Do not assume the answer of your own.
 
 You are given the exact figures retrieved from a database. Rules:
 - Use ONLY the numbers given to you. Never compute, adjust, round differently, or invent a figure.
@@ -27,6 +28,17 @@ You are given the exact figures retrieved from a database. Rules:
 """
 
 
+def format_value(v):
+    """Preserve decimals when they carry meaning. Yield (Mt/Ha) is precise to
+    two places -- formatting 35.59 as "36" silently destroys real precision
+    before the model ever sees it. Whole numbers stay whole."""
+    if v is None:
+        return "no value recorded"
+    if float(v).is_integer():
+        return f"{v:,.0f}"
+    return f"{v:,.2f}"
+
+
 def format_rows(rows, meta):
     """Turn retrieved rows into the compact text block given to the model.
     Dedupes identical values reported by multiple source tables."""
@@ -39,7 +51,8 @@ def format_rows(rows, meta):
         seen.add(key)
         crop = r["crop"] or "all crops combined"
         lines.append(
-            f"- {r['entity_name']}: {crop}, {r['measure']} = {r['value_num']:,.0f} ({r['period']})"
+            f"- {r['entity_name']}: {crop}, {r['measure']} = "
+            f"{format_value(r['value_num'])} ({r['period']})"
         )
 
     if meta.get("kind") == "compare_periods":
@@ -47,7 +60,8 @@ def format_rows(rows, meta):
         pct = meta.get("pct_change")
         direction = "increase" if change >= 0 else "decrease"
         pct_text = f" ({abs(pct):.1f}% {direction})" if pct is not None else ""
-        lines.append(f"- computed change: {change:+,.0f}{pct_text}")
+        sign = "+" if change >= 0 else "-"
+        lines.append(f"- computed change: {sign}{format_value(abs(change))}{pct_text}")
 
     return "\n".join(lines)
 

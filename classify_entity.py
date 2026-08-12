@@ -30,6 +30,15 @@ spot one in validation output.
 """
 import sqlite3
 from canonicalize import canonical_province, canonical_district
+import re
+
+import re
+
+def _clean_label(text):
+    """Strip trailing punctuation before matching. Page 14 writes the national
+    row as 'N E P A L :'; an exact-match lookup misses it, and a missed national
+    label falls through to the row path, which strips the crop off the value."""
+    return re.sub(r"[\s:.\-]+$", "", (text or "").strip()).strip().lower()
 
 PROVINCES = {"Koshi", "Madhesh", "Bagmati", "Gandaki", "Lumbini",
              "Karnali", "Sudurpashchim", "Sudurpaschim"}
@@ -40,31 +49,33 @@ NATIONAL_LABELS = {"nepal", "n e p a l"}
 SPELLING_ALIASES = {}
 
 
-def build_district_vocab(fact_db_path: str):
-    """{DISTRICT_NAME_UPPER: province} harvested from already-classified
-    district rows in fact.db. Call this once per session; re-call after
-    normalizing more district tables to pick up new districts."""
+def build_district_vocab(fact_db_path: str, table: str = "fact_generic"):
     vocab = {}
     try:
         conn = sqlite3.connect(fact_db_path)
         rows = conn.execute(
-            "SELECT DISTINCT entity_name, entity_path FROM fact WHERE entity_type='district'"
+            f"SELECT DISTINCT entity_name, entity_path FROM {table} WHERE entity_type='district'"
         ).fetchall()
         for name, path in rows:
             province = path.split(" > ")[0] if path and " > " in path else None
             if province:
                 vocab[canonical_district(name)] = canonical_province(province)
-    except sqlite3.OperationalError:
-        pass  # fact.db doesn't exist yet or has no fact table -- empty vocab is fine
+    except sqlite3.OperationalError as e:
+        print(f"[warn] district vocabulary unavailable ({e}) -- "
+              f"district names will not be recognised this run")
     return vocab
 
 
 def _province_match(text: str):
-    """Case-insensitive province lookup -- some tables write province
-    names in ALL CAPS (e.g. 'KOSHI'), which a plain 'in PROVINCES' check
-    misses since PROVINCES is stored in title case."""
+    """Case-insensitive province lookup that also accepts spelling variants.
+    CANONICAL_PROVINCES knows 'madhes' -> 'Madhesh' and 'sudurpaschim' ->
+    'Sudurpashchim'; PROVINCES alone holds only canonical spellings, so
+    matching against it directly missed the variants the source actually uses."""
+    if not text:
+        return None
+    canon = canonical_province(text)
     for p in PROVINCES:
-        if text.strip().lower() == p.lower():
+        if canon.lower() == p.lower():
             return canonical_province(p)
     return None
 
@@ -76,7 +87,7 @@ def classify_entity(label: tuple, district_vocab: dict):
     if len(label) == 1:
         text = label[0].strip()
         text_key = canonical_district(SPELLING_ALIASES.get(text.upper(), text))
-        if text.lower() in NATIONAL_LABELS:
+        if _clean_label(text) in NATIONAL_LABELS:
             return dict(entity_type="national", entity_name="Nepal", entity_path="Nepal")
         province_match = _province_match(text)
         if province_match:
@@ -90,7 +101,7 @@ def classify_entity(label: tuple, district_vocab: dict):
 
     if len(label) == 2:
         first, second = (label[0] or "").strip(), (label[1] or "").strip()
-        if first.lower() in NATIONAL_LABELS:
+        if _clean_label(first) in NATIONAL_LABELS:
             return dict(entity_type="national", entity_name="Nepal", entity_path="Nepal")
         province_match = _province_match(first)
         if province_match and not second:

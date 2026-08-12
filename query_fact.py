@@ -75,6 +75,15 @@ def q_superlative(conn, intent, period):
 
     # case 1: rank items within a sector
     if intent.get("sector") and not intent.get("crop"):
+        # Scope to ONE geography, defaulting to national. Without this the
+        # ranking mixes district rows with national ones and "lowest" finds
+        # whichever district happens not to grow something.
+        scope = intent.get("entity_type") or "national"
+        place = intent.get("place") or ("Nepal" if scope == "national" else None)
+
+        # Exclude zeros: a crop that simply isn't cultivated somewhere is not
+        # meaningfully "the lowest producer", and zeros otherwise dominate any
+        # ascending ranking.
         sql = f"""
             SELECT entity_name, entity_path, crop, sector, measure, period,
                    value_num, source_table_id
@@ -84,10 +93,16 @@ def q_superlative(conn, intent, period):
               AND sector = ?
               AND crop IS NOT NULL
               AND crop_is_total = 0
+              AND value_num > 0
+              AND entity_type = ?
+              {'AND entity_name = ?' if place else ''}
             ORDER BY value_num {direction}
             LIMIT 5
         """
-        rows = conn.execute(sql, [intent["measure"], period, intent["sector"]]).fetchall()
+        params = [intent["measure"], period, intent["sector"], scope]
+        if place:
+            params.append(place)
+        rows = conn.execute(sql, params).fetchall()
         if rows:
             return rows
         # fall through to place-ranking if the sector had no rankable items
@@ -100,7 +115,7 @@ def q_superlative(conn, intent, period):
         WHERE measure = ?
           AND period = ?
           AND entity_type = ?
-          AND geo_is_total = 0
+          AND value_num > 0
           AND {'crop = ?' if intent['crop'] else 'crop_is_total = 1'}
         ORDER BY value_num {direction}
         LIMIT 5
@@ -115,6 +130,8 @@ def q_aggregate(conn, intent, period):
     """A total. Prefers the source's own stated total row over re-summing
     parts -- the report's totals are authoritative and avoid double counting."""
     scope = intent.get("entity_type") or "national"
+    # A specific crop always beats a sector: "total wheat area" means wheat,
+    # not the cereal sector, even when the model fills in both fields.
     if intent["crop"]:
         sql = f"""
             SELECT entity_name, crop, sector, measure, period, value_num, source_table_id
@@ -198,8 +215,63 @@ def run_query(db_path, intent, vocab):
         raise QueryError(f"Unhandled intent type {kind!r}")
 
     if not rows:
-        raise QueryError(
-            f"No rows matched: {intent['crop'] or 'all crops'} / "
-            f"{intent['place'] or intent['entity_type'] or 'any'} / "
-            f"{intent['measure']} / {period}")
+        raise QueryError(explain_empty(conn, intent, period))
     return rows, meta
+
+
+def explain_empty(conn, intent, period):
+    """Say WHY nothing matched, not just that nothing did.
+
+    Three very different situations look identical otherwise:
+      - the place genuinely doesn't have that crop recorded (real absence)
+      - that measure isn't reported for that crop (e.g. no Yield column)
+      - the source table isn't in METADATA yet (our coverage gap)
+    Narrowing the filters one at a time tells them apart.
+    """
+    crop = intent.get("crop")
+    place = intent.get("place")
+    measure = intent.get("measure")
+
+    def count(**filters):
+        clauses, params = [], []
+        for col, val in filters.items():
+            if val is not None:
+                clauses.append(f"{col} = ?")
+                params.append(val)
+        where = " AND ".join(clauses) if clauses else "1=1"
+        return conn.execute(
+            f"SELECT COUNT(*) FROM {TABLE} WHERE {where}", params).fetchone()[0]
+
+    described = (f"{crop or 'all crops'} / {place or intent.get('entity_type') or 'any'} "
+                 f"/ {measure} / {period}")
+
+    if place and count(entity_name=place) == 0:
+        return (f"No data at all for {place} in the dataset. Its source table may "
+                f"not be loaded yet (not every table in the report has been added).")
+
+    if crop and count(crop=crop) == 0:
+        return f"{crop} appears in the vocabulary but has no rows loaded yet."
+
+    if crop and place and count(crop=crop, entity_name=place) == 0:
+        return (f"No {crop} recorded for {place}. Either it isn't grown there, or "
+                f"the source table left that cell blank -- the report does have "
+                f"blank cells, and a blank is not the same as zero.")
+
+    if crop and place and measure and count(crop=crop, entity_name=place, measure=measure) == 0:
+        available = [r[0] for r in conn.execute(
+            f"SELECT DISTINCT measure FROM {TABLE} WHERE crop = ? AND entity_name = ?",
+            [crop, place])]
+        return (f"{crop} for {place} has no {measure} figure"
+                + (f" -- available: {', '.join(available)}." if available else "."))
+
+    if period:
+        other = [r[0] for r in conn.execute(
+            f"""SELECT DISTINCT period FROM {TABLE}
+                WHERE {'crop = ?' if crop else '1=1'}
+                  AND {'entity_name = ?' if place else '1=1'}""",
+            [v for v in (crop, place) if v])]
+        if other and period not in other:
+            return (f"Nothing for {described}. That combination is recorded for: "
+                    f"{', '.join(sorted(other))}.")
+
+    return f"Nothing matched {described}."
