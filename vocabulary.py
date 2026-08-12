@@ -94,7 +94,24 @@ class Vocabulary:
 
         close = get_close_matches(term.lower(), list(lower_map.keys()), n=3, cutoff=0.75)
         if close:
-            return lower_map[close[0]], f"fuzzy ({term} -> {lower_map[close[0]]})"
+            candidate = lower_map[close[0]]
+            # A fuzzy match must not drop a qualifying word: "yak milk" -> "Milk"
+            # silently changes what was asked for, while "buffalo milk" ->
+            # "Buffalo Milk" and "sugercane" -> "Sugarcane" do not. Character
+            # overlap alone can't tell these apart -- "yak milk" scored above the
+            # cutoff against "Milk" purely because it is short.
+            term_words = set(term.lower().split())
+            cand_words = set(candidate.lower().split())
+            dropped = term_words - cand_words
+            if dropped and len(term_words) > 1:
+                # allow only if each dropped word is itself a near-miss of some
+                # candidate word (typos), not a real qualifier
+                if not all(get_close_matches(w, list(cand_words), n=1, cutoff=0.8)
+                           for w in dropped):
+                    suggestions = get_close_matches(term.lower(), list(lower_map.keys()),
+                                                    n=3, cutoff=0.4)
+                    return None, [lower_map[s] for s in suggestions]
+            return candidate, f"fuzzy ({term} -> {candidate})"
 
         suggestions = get_close_matches(term.lower(), list(lower_map.keys()), n=3, cutoff=0.4)
         return None, [lower_map[s] for s in suggestions]
