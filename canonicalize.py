@@ -49,7 +49,7 @@ NON_CROP_PATTERNS = [
 # Crop spelling/singular-plural variants.
 CROP_ALIASES = {
     "oilseed": "Oilseeds",
-    "dry chilli": "Dry Chili",
+    "dry chili": "Dry Chilli",
 }
 
 

@@ -8,10 +8,19 @@ don't state them anywhere in their own HTML.
 """
 import sqlite3
 from datetime import datetime, timezone
-from generic_melt import melt_table
+from generic_melt import melt_table, expand_grid, drop_title_rows, BeautifulSoup
 from classify_entity import build_district_vocab, classify_entity
 from classify_column import classify_column_path
 from canonicalize import canonical_crop
+
+
+def _table_width(html):
+    """Column count of a table's own grid, after merges are resolved and any
+    title row dropped. Used to decide how to combine a table split across
+    pages -- see the comment where this is called."""
+    soup = BeautifulSoup(html, "html.parser")
+    grid = drop_title_rows(expand_grid(soup.find("table")))
+    return len(grid[0]) if grid else 0
 
 METADATA = {
     "Statistical_Nepalese_Agriculture-9-45_p1_t2": dict(sector="Cereal Crops"),
@@ -166,6 +175,43 @@ METADATA = {
         sector="Cereal Crops by District", period_default="2080/81 (2023/24)",
         extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p14_t20"]),
 
+    # --- Coffee by district (page 30-31): leading S.N. column, per-column measures ---
+    "Statistical_Nepalese_Agriculture-9-45_p30_t38": dict(
+        sector="Coffee", period_default="2080/81 (2023/24)",
+        # "Production (Mt) Green Bean" doesn't match any MEASURE_SYNONYMS
+        # phrase (it's a compound header, not a bare "Production"/"Mt"), so
+        # col["measure"] comes back None for it -- measure_default carries it,
+        # same as Tea. measure_by_crop below still overrides Count/Area.
+        measure_default="Production",
+        extra_table_ids=["Statistical_Nepalese_Agriculture-9-45_p31_t39"],
+        crop_map={
+            "Small Farmers (No.)": "Coffee Small Farmers",
+            "Plantation (Ha)": "Coffee Plantation Area",
+            "Production (Mt) Green Bean": "Coffee",
+            "__default__": "Coffee",
+        },
+        measure_by_crop={
+            "Coffee Small Farmers": "Count",
+            "Coffee Plantation Area": "Area",
+        },
+        units_by_crop_measure={
+            ("Coffee", "Production"): "metric tonnes",
+            ("Coffee", "Yield"): "kg/ha",
+            ("Coffee Plantation Area", "Area"): "hectares",
+            ("Coffee Small Farmers", "Count"): "farmers",
+        }),
+
+   # Year-as-row tables: period comes from the row label, not a config default.
+    # These store ten years of history rather than one snapshot.
+    "Statistical_Nepalese_Agriculture-9-45_p6_t11": dict(
+        sector="Cereal Crops", measure_default="Production",
+        row_is_period=True),
+    "Statistical_Nepalese_Agriculture-9-45_p20_t24": dict(
+        sector="Cash Crops", measure_default="Production",
+        row_is_period=True),
+    "Statistical_Nepalese_Agriculture-9-45_p33_t41": dict(
+        sector="Mulberry", measure_default="Production",
+        row_is_period=True),
 }
 
 
@@ -193,23 +239,55 @@ def normalize_generic(raw_db_path, fact_db_path):
             if row: html_parts.append(row[0])
         if not html_parts:
             continue
-        if len(html_parts) == 1:
-            html = html_parts[0]
-        else:
-            from generic_melt import BeautifulSoup
+
+        # Two ways to combine a table split across pages, and the right one
+        # depends on whether the pages actually share a column layout:
+        #  - same width: splice every page's <tr> under the FIRST page's
+        #    <table> and melt once. This tolerates a later page's header text
+        #    being sparser than the first page's (e.g. Paddy's page 3 repeats
+        #    the period but drops the "Main Paddy"/"Total Paddy" suffix that
+        #    page 1 states) -- header text is only reused where a page leaves
+        #    it out, and every row still lines up column-for-column.
+        #  - different width: splicing breaks, because it makes later pages'
+        #    narrower rows get read against the first page's wider header,
+        #    shifting every column after the gap (Spices: one page is missing
+        #    a whole sub-column). Melt each page separately with its OWN
+        #    header instead, so a page-local width difference can't bleed
+        #    into another page's column meanings.
+        widths = [_table_width(h) for h in html_parts]
+        if len(set(widths)) == 1:
             first_soup = BeautifulSoup(html_parts[0], "html.parser")
             first_table = first_soup.find("table")
             for extra in html_parts[1:]:
                 extra_rows = BeautifulSoup(extra, "html.parser").find_all("tr")[1:]
                 for r in extra_rows: first_table.append(r)
-            html = str(first_table)
+            melted, _ = melt_table(str(first_table))
+        else:
+            melted = []
+            for html_part in html_parts:
+                part_melted, _ = melt_table(html_part)
+                melted.extend(part_melted)
+        TOTAL_LABELS = {"total", "grand total", "totals", "sub total", "subtotal"}
 
-        melted, _ = melt_table(html)
+        # Classify every label once up front so we know, before the main loop,
+        # whether this table has a geography dimension at all (any label that
+        # resolved to a real district). That answers a question the per-row
+        # loop below can't answer on its own: does an unmatched row-type label
+        # mean "this table's rows are crop names" (true for a plain crop list,
+        # e.g. livestock categories) or "classify_entity couldn't resolve this
+        # particular row's geography" (true here -- a corrupted/garbled cell,
+        # e.g. two source rows fused into one: "Karnali Karnali"/"HUMLA JUMLA",
+        # or a province name duplicated into the district column). The two
+        # cases need opposite handling and look identical without this check.
+        entities = [classify_entity(m["label"], vocab) for m in melted]
+        has_district = any(e["entity_type"] == "district" for e in entities)
+
         table_rows = []
-        for m in melted:
-            entity = classify_entity(m["label"], vocab)
+        for m, entity in zip(melted, entities):
+            if (has_district and entity["entity_type"] == "row"
+                    and entity["entity_name"].strip().lower() not in TOTAL_LABELS):
+                continue  # unresolved geography in a geography table -- drop, don't fabricate a crop
             col = classify_column_path(m["column_path"])
-            TOTAL_LABELS = {"total", "grand total", "totals", "sub total", "subtotal"}
             is_total_label = entity["entity_type"] == "row" and entity["entity_name"].strip().lower() in TOTAL_LABELS
             col_qualifier = col["qualifiers"][0] if col["qualifiers"] else None
             col_is_total = col_qualifier is not None and col_qualifier.strip().lower() in TOTAL_LABELS
@@ -217,10 +295,34 @@ def normalize_generic(raw_db_path, fact_db_path):
                 crop = None                      # the column itself is a total
             elif is_total_label and not col_qualifier:
                 crop = None                      # row total, and no crop in the column
+            elif (is_total_label and col_qualifier
+                  and col_qualifier in (meta.get("crop_map") or {})):
+                # A grand-total row (e.g. Coffee's "Total" district row) paired
+                # with a column whose header the table's OWN crop_map already
+                # names explicitly (e.g. "Small Farmers (No.)") -- the column
+                # is the real crop, the row label just marks this as the
+                # whole-table total. Gated on an explicit crop_map hit (not
+                # "any non-empty qualifier") so this doesn't fire on tables
+                # where columns carry incidental, non-crop text (e.g. a title
+                # row a upstream cleanup step missed) -- there the row label
+                # below is still the right source of truth for the crop.
+                crop = col_qualifier
             elif entity["entity_type"] == "row":
                 crop = entity["entity_name"]
             else:
-                crop = col_qualifier             
+                crop = col_qualifier
+                if crop is None:
+                    # No group header at all above this column -- distinct from
+                    # col_is_total/is_total_label above, which set crop=None on
+                    # purpose for a real "Total" label. A blank qualifier only
+                    # means something when crop_map spells out what blank means
+                    # (e.g. an unlabelled middle column). Otherwise this is a
+                    # corrupted/missing header cell with no attributable crop;
+                    # inserting it as crop=None would silently fold unrelated
+                    # data into the same bucket used for legitimate totals.
+                    crop_map_here = meta.get("crop_map") or {}
+                    if "" not in crop_map_here and "__default__" not in crop_map_here:
+                        continue
             crop_map = meta.get("crop_map")
             if crop_map and crop in crop_map:
                 crop = crop_map[crop]          # explicit mapping wins, skip canonicalization
@@ -233,19 +335,31 @@ def normalize_generic(raw_db_path, fact_db_path):
                 # whole-table national-level rows (e.g. crop_year_metric) -- whether
                 # it was a real crop or a "Total" label, the geography here is Nepal
                 entity = dict(entity_type="national", entity_name="Nepal", entity_path="Nepal")
+
+            measure = (meta.get("measure_by_crop", {}).get(crop)
+                       or col["measure"] or meta.get("measure_default"))
+            if crop is not None and measure is None:
+                # A named crop with no resolvable measure means the header
+                # cell for this column was itself corrupted (e.g. two sub-
+                # column headers fused into one, "Production Yield") -- we
+                # can't tell what quantity the value represents. Inserting it
+                # anyway would create a fact with a meaningless NULL measure
+                # that no real question can match, and it would silently
+                # merge with any other unresolved column under the same
+                # crop. Drop it instead of guessing.
+                continue
+
             table_rows.append(dict(
                 entity_type=entity["entity_type"], entity_name=entity["entity_name"],
                 entity_path=entity["entity_path"], crop=crop, sector=meta["sector"],
-                measure=(meta.get("measure_by_crop", {}).get(crop)
-                         or col["measure"] or meta.get("measure_default")),
-                unit=(meta.get("units_by_crop", {}).get(crop)
-                      or meta.get("units", {}).get(
-                          col["measure"] or meta.get("measure_default"))),
+                measure=measure,
+                unit=(meta.get("units_by_crop_measure", {}).get((crop, measure))
+                      or meta.get("units_by_crop", {}).get(crop)
+                      or meta.get("units", {}).get(measure)),
                 period=col["period"] or meta.get("period_default"),
                 value_num=m["value"], source_table_id=table_id,
             ))
 
-        has_district = any(r["entity_type"] == "district" for r in table_rows)
         for r in table_rows:
             r["geo_is_total"] = r["entity_type"] == "national" or (r["entity_type"] == "province" and has_district)
             r["crop_is_total"] = r["crop"] is None

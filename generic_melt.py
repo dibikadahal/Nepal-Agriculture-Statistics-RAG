@@ -93,6 +93,67 @@ def drop_title_rows(grid):
     return grid
 
 
+SERIAL_HEADER_RE = re.compile(r"^s\.?\s*n\.?$", re.IGNORECASE)
+SERIAL_HEADER_WORDS = {"serial", "sn", "serial no", "serial no.", "serial number"}
+
+
+def _is_serial_column(header_rows, data_rows):
+    """True if column 0 is a row-index ("S.N.") column rather than data:
+    its header reads like a serial-number label AND its values are small,
+    near-consecutive integers. Both conditions are required so this never
+    fires on a real leading data column (e.g. a "Year" column) that merely
+    happens to look numeric."""
+    if not data_rows:
+        return False
+    header_text = ""
+    for hr in header_rows:
+        if hr and hr[0].strip():
+            header_text = hr[0].strip()
+    if not (SERIAL_HEADER_RE.match(header_text) or header_text.lower() in SERIAL_HEADER_WORDS):
+        return False
+
+    values = []
+    unparseable = 0
+    for r in data_rows:
+        v = parse_number(r[0])
+        if v is None or v != int(v):
+            unparseable += 1
+            continue
+        values.append(int(v))
+    # Tolerate a small fraction of rows that don't parse as an integer -- e.g.
+    # a trailing "Total" row with a blank S.N. cell -- rather than requiring
+    # every single row to be clean. Multi-page tables in particular tend to
+    # end in one such summary row.
+    if not values or unparseable / len(data_rows) > 0.1:
+        return False
+    if values[0] not in (0, 1):
+        return False
+
+    diffs = [b - a for a, b in zip(values, values[1:])]
+    if diffs and sum(1 for d in diffs if d == 1) / len(diffs) < 0.9:
+        return False
+    return True
+
+
+def _header_label_cols(header_rows, n_cols):
+    """Count leading columns whose TOP header row cell is blank -- those sit
+    outside every column group (e.g. "Province"/"Districts" before a row of
+    per-crop group headers like "Large Cardamom"/"Ginger"). Returns 0 when
+    the header gives no signal (e.g. a single-row header where every column,
+    label or not, has header text), so the caller can fall back to the
+    data-based heuristic."""
+    if not header_rows:
+        return 0
+    top = header_rows[0]
+    count = 0
+    for c in range(n_cols):
+        if top[c].strip() == "":
+            count += 1
+        else:
+            break
+    return count
+
+
 def melt_table(html: str):
     """Returns (melted_rows, header_row_count). Each melted row is
     {label: (...), column_path: (...), value: float}."""
@@ -119,17 +180,30 @@ def melt_table(html: str):
     if not data_rows:
         return [], header_end
 
-    # refine: find the true label-column count -- longest prefix of columns
-    # that are non-numeric across at least 80% of data rows
-    label_cols = 1
-    for c in range(n_cols):
-        non_numeric = sum(1 for r in data_rows if parse_number(r[c]) is None)
-        if non_numeric / len(data_rows) >= 0.8:
-            label_cols = c + 1
-        else:
-            break
-
     header_rows = grid[:header_end]
+
+    # a leading "S.N." column is a row index, not data -- drop it entirely so
+    # the real label column (e.g. district name) takes its place
+    if n_cols > 1 and _is_serial_column(header_rows, data_rows):
+        grid = [row[1:] for row in grid]
+        n_cols -= 1
+        header_rows = grid[:header_end]
+        data_rows = grid[header_end:]
+
+    # find the true label-column count: prefer the header's own structure --
+    # leading columns with a blank top-level header cell sit outside every
+    # column group and are labels. Fall back to the data-based heuristic
+    # (longest prefix of columns non-numeric across >=80% of data rows) only
+    # when the header gives no answer (e.g. a flat, single-row header).
+    label_cols = _header_label_cols(header_rows, n_cols)
+    if label_cols == 0:
+        label_cols = 1
+        for c in range(n_cols):
+            non_numeric = sum(1 for r in data_rows if parse_number(r[c]) is None)
+            if non_numeric / len(data_rows) >= 0.8:
+                label_cols = c + 1
+            else:
+                break
 
     # build each value column's header path by reading down the header rows
     column_paths = []

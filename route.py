@@ -20,9 +20,18 @@ This covers crops, livestock, fertilizer -- anything counted or measured.
 Examples: "which province produced the most paddy", "total cereal production
 in 2080/81", "how did wheat production change", "how much maize did Bagmati grow",
 "how many cattle were there in 2080/81", "which livestock category had the
-highest population", "how much urea was sold", "which fertilizer sold the most"
+highest population", "how much urea was sold", "which fertilizer sold the most",
+"which district has the most tea estates", "how many tea small farmers are in
+Ilam", "what is the total tea area in Ilam", "which district has the highest
+livestock population"
 
-Words like "category", "type", or "kind" do NOT make a question prose -- 
+A question is numeric whenever its answer is a number that comes from a
+statistics table -- it does not matter whether the measure behind that number
+is production, area, yield, count, population, or sales. Counting things
+("how many tea estates", "how many small farmers") is just as numeric as
+measuring quantities.
+
+Words like "category", "type", or "kind" do NOT make a question prose --
 "which livestock category had the highest population" is still a ranking
 from a table, so it is numeric.
 

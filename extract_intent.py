@@ -41,7 +41,7 @@ Schema:
   "sector": sector/group name or null,
   "place": place name or null,
   "entity_type": one of ["national", "province", "district"] or null,
-  "measure": one of ["Area", "Production", "Yield"] or null,
+  "measure": one of ["Area", "Production", "Yield", "Count", "Population", "Sales"] or null,
   "period": period string or null,
   "period_2": second period (only for compare_periods) or null,
   "direction": "max" or "min" (only for superlative) or null
@@ -130,21 +130,23 @@ Question: how much urea was sold in 2080/81
 Question: how did wheat production change from 2078/79 to 2080/81
 {{"intent": "compare_periods", "crop": "Wheat", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
-Some items are counts rather than quantities: "Tea Estates" and "Tea Small
-Farmers" use measure="Count". Livestock animals use measure="Population".
-Do not confuse the two -- Population is only for the animals in the Livestock
-sector.
+Measures vary by what is being counted. "Count" is the measure for numbers of
+things -- Tea Estates, Tea Small Farmers -- not quantities of them. "Population"
+is ONLY for livestock animals (cattle, goats, buffaloes) -- never use it outside
+the Livestock sector. "Sales" is for fertilizer. Do not confuse Count and
+Population: a count of estates or farmers is not a population.
+
+Tea has several distinct line items in the CROPS list that are not the crop
+"Tea" itself: "Tea Area", "Tea Estate Area", "Tea Smallholder Area", "Tea
+Estates", "Tea Small Farmers". Each of these is its own CROP, not a sector --
+"Tea" is also a sector name, but a question about tea estates or tea area
+means crop="Tea Estates" / crop="Tea Area" with sector=null, not sector="Tea".
 
 Question: which district has the most tea estates
 {{"intent": "superlative", "crop": "Tea Estates", "sector": null, "place": null, "entity_type": "district", "measure": "Count", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
 
-Measures vary by what is being counted. "Count" is for numbers of things
-(Tea Estates, Tea Small Farmers). "Population" is ONLY for livestock animals
-(cattle, goats, buffaloes). "Sales" is for fertilizer. Do not use Population
-for anything outside the Livestock sector.
-
-Question: which district has the most tea estates
-{{"intent": "superlative", "crop": "Tea Estates", "sector": null, "place": null, "entity_type": "district", "measure": "Count", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
+Question: what is the total tea area in Ilam
+{{"intent": "lookup", "crop": "Tea Area", "sector": null, "place": "Ilam", "entity_type": "district", "measure": "Area", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 """
 
 

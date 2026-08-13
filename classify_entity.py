@@ -35,10 +35,16 @@ import re
 import re
 
 def _clean_label(text):
-    """Strip trailing punctuation before matching. Page 14 writes the national
-    row as 'N E P A L :'; an exact-match lookup misses it, and a missed national
-    label falls through to the row path, which strips the crop off the value."""
-    return re.sub(r"[\s:.\-]+$", "", (text or "").strip()).strip().lower()
+    """Normalize a label before matching: strip trailing punctuation and any
+    leading/trailing 'total' wording. The source writes the national row
+    inconsistently -- 'N E P A L :' on page 14, 'Total Nepal' on page 32 --
+    and an unrecognized national label falls through to the row path, which
+    strips the crop and makes the row unreachable."""
+    t = (text or "").strip().lower()
+    t = re.sub(r"[\s:.\-]+$", "", t)              # trailing punctuation
+    t = re.sub(r"^(grand\s+)?total\s+", "", t)    # leading "Total " / "Grand total "
+    t = re.sub(r"\s+total$", "", t)               # trailing " Total"
+    return t.strip()
 
 PROVINCES = {"Koshi", "Madhesh", "Bagmati", "Gandaki", "Lumbini",
              "Karnali", "Sudurpashchim", "Sudurpaschim"}
@@ -107,6 +113,14 @@ def classify_entity(label: tuple, district_vocab: dict):
         if province_match and not second:
             return dict(entity_type="province", entity_name=province_match, entity_path=province_match)
         if province_match and second:
+            if second.strip().lower() == first.strip().lower():
+                # A province subtotal row whose label cell used colspan="2"
+                # (spanning both label columns) gets its text duplicated into
+                # BOTH grid columns by expand_grid -- e.g. <th colspan="2">
+                # Karnali</th> becomes ('Karnali', 'Karnali'). That's the
+                # province name repeated by the merge, not a real district
+                # that happens to share the province's name.
+                return dict(entity_type="province", entity_name=province_match, entity_path=province_match)
             canon = canonical_district(second)
             return dict(entity_type="district", entity_name=canon, entity_path=f"{province_match} > {canon}")
         return dict(entity_type="row", entity_name=" / ".join(label), entity_path=" / ".join(label))
