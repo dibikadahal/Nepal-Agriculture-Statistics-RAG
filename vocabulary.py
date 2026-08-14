@@ -56,6 +56,16 @@ PERIOD_ALIASES = {
     "latest": "2080/81 (2023/24)", "most recent": "2080/81 (2023/24)",
 }
 
+# Matches a two-token period like "2078/79 (2021/22)" OR the reversed
+# "2021/22 (2078/79)" -- the model occasionally emits the BS/AD halves in
+# the wrong order once the vocabulary contains BOTH composite periods
+# ("2078/79 (2021/22)", from most tables) and bare single-format periods
+# ("2021/22", from the row_is_period tables -- Honey, Mushroom, Mulberry).
+# Nothing distinguishes these two formats for the model, so it sometimes
+# blends them. Confirmed live: "2021/22 (2078/79)" returned for a Honey
+# question, which matches neither stored form.
+PERIOD_PAIR_RE = re.compile(r"\s*(\d{4}/\d{2})\s*\(\s*(\d{4}/\d{2})\s*\)\s*$")
+
 
 class Vocabulary:
     def __init__(self, db_path: str, table: str = "fact_generic"):
@@ -123,6 +133,17 @@ class Vocabulary:
         return self._match(term, self.measures, ALIASES)
 
     def match_period(self, term):
+        """Tries both orderings of a two-token "X (Y)" period before falling
+        through to the normal exact/alias/fuzzy matcher -- see PERIOD_PAIR_RE
+        above for why the model sometimes emits the halves reversed."""
+        if term:
+            m = PERIOD_PAIR_RE.match(term.strip())
+            if m:
+                a, b = m.group(1), m.group(2)
+                period_set = set(self.periods)
+                for candidate in (f"{a} ({b})", f"{b} ({a})", a, b):
+                    if candidate in period_set:
+                        return candidate, "exact"
         return self._match(term, self.periods, PERIOD_ALIASES)
 
     def match_sector(self, term):
