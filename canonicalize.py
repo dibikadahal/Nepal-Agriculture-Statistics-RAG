@@ -52,6 +52,26 @@ CROP_ALIASES = {
     "dry chili": "Dry Chilli",
 }
 
+# Crop-name CASING variants: the ten-year tables (row_is_period=True in
+# METADATA) store crop names as ALL-CAPS column headers (e.g. Table 1.1's
+# "WHEAT", "MAIZE"), while every other table uses normal casing for the same
+# crop ("Wheat", "Maize"). Left unmapped, these were two different strings
+# to the database, so a query for one silently missed rows filed under the
+# other -- confirmed via "maize yield trend from 2013/14" returning no data,
+# since that year only exists under the ALL-CAPS ten-year table.
+#
+# Scoped explicitly to the crops confirmed split, rather than a blanket
+# titlecase rule: Livestock genuinely uses ALL CAPS as its real canonical
+# form ("CATTLE", "GOAT", "BUFFALOES") and Vocabulary/ALIASES already
+# expects that exact casing -- a blanket rule would break Livestock while
+# fixing this.
+CROP_CASE_ALIASES = {
+    "WHEAT": "Wheat", "MAIZE": "Maize", "PADDY": "Paddy",
+    "MILLET": "Millet", "BUCKWHEAT": "Buckwheat", "BARLEY": "Barley",
+    "COTTON": "Cotton", "JUTE": "Jute", "POTATO": "Potato",
+    "SUGARCANE": "Sugarcane",
+}
+
 
 def canonical_province(name):
     if not name:
@@ -83,6 +103,10 @@ def canonical_crop(name, known_provinces=None, known_districts=None):
         return None
     if known_districts and text.upper() in known_districts:
         return None
+
+    case_aliased = CROP_CASE_ALIASES.get(text)
+    if case_aliased:
+        return case_aliased
 
     aliased = CROP_ALIASES.get(text.lower())
     if aliased:
