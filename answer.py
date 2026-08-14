@@ -8,7 +8,8 @@ whole rebuild -- language ambiguity gets a model, arithmetic does not.
 
 Percent changes are computed in Python (query_fact.q_compare_periods)
 and passed in as text, so even derived numbers never originate from the
-model.
+model. Multi-crop totals (query_fact.run_query, the "crops" intent case)
+follow the same rule: summed in Python, handed over as a ready-made line.
 """
 from extract_intent import call_ollama
 
@@ -21,6 +22,10 @@ You are given the exact figures retrieved from a database. Rules:
   to whichever single item the question mentioned. If the question asked about
   one item but the figure given is a combined total, say so plainly instead of
   presenting the total as that item's value.
+- If a line is labelled "computed total", that is the already-summed answer to
+  a multi-item question (e.g. two named crops combined) -- report that number
+  as the total. Do NOT add up the individual crop lines above it yourself; the
+  combined figure is already done for you.
 - If the answer covers a fiscal year, name it.
 - Be direct. No preamble, no bullet points, no restating the question.
 - Use exactly the unit shown next to a figure. Only when NO unit is shown next to a figure, fall back to: production = metric tonnes, area = hectares, yield = metric tonnes per hectare. Never say metric tonnes when a different unit is given.
@@ -67,6 +72,15 @@ def format_rows(rows, meta):
         pct_text = f" ({abs(pct):.1f}% {direction})" if pct is not None else ""
         sign = "+" if change >= 0 else "-"
         lines.append(f"- computed change: {sign}{format_value(abs(change))}{pct_text}")
+
+    if meta.get("computed_total") is not None:
+        crops_str = " + ".join(meta.get("computed_total_crops") or [])
+        unit = meta.get("computed_total_unit")
+        unit_str = f" {unit}" if unit else ""
+        lines.append(
+            f"- computed total ({crops_str} combined): "
+            f"{format_value(meta['computed_total'])}{unit_str}"
+        )
 
     return "\n".join(lines)
 
