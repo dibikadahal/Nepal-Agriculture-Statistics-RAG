@@ -1,5 +1,5 @@
 """
-Router: decide whether a question goes to the numeric path or the prose path.
+Router: decide whether a question goes to the numeric or the prose path.
 
 "which province grew the most millet" and "what does the report say about
 millet cultivation" look similar but need completely different retrieval --
@@ -35,6 +35,13 @@ Words like "category", "type", or "kind" do NOT make a question prose --
 "which livestock category had the highest population" is still a ranking
 from a table, so it is numeric.
 
+Geography and land-area questions about Nepal's provinces, districts, or
+ecological belts (Mountain, Hill, Terai) are ALSO numeric whenever they ask
+for a figure -- area, percentage, count -- even though they are not about a
+crop or livestock. Examples: "what percentage of Nepal's area is Hill
+region" is numeric. "how many square kilometers does the Terai belt cover"
+is numeric. "which ecological belt has the largest area" is numeric.
+
 "prose" -- the answer is explanatory text: definitions, methodology, notes,
 commentary, what the report says about something.
 Examples: "how is yield calculated", "what does the report say about fertilizer
@@ -42,7 +49,17 @@ supply", "what period does this report cover", "how was the data collected"
 """
 
 
-def route_question(question, model="qwen2.5:7b-instruct"):
+def route_question(question, model="qwen2.5:7b-instruct", vocab=None):
+    """vocab is optional: if a Vocabulary instance is passed, any question that
+    literally names a known sector (e.g. "Ecological Belt") is routed to
+    numeric without calling the LLM at all -- a deterministic safety net for
+    sector names the few-shot prompt above doesn't happen to cover."""
+    if vocab is not None:
+        q_lower = question.lower()
+        for sector in vocab.sectors:
+            if sector.lower() in q_lower:
+                return "numeric"
+
     raw = call_ollama(f"Question: {question}", ROUTE_SYSTEM, model=model, as_json=True)
     try:
         cleaned = re.sub(r"^```(?:json)?|```$", "", raw.strip(), flags=re.MULTILINE).strip()
