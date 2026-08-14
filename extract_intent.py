@@ -38,6 +38,7 @@ Schema:
 {{
   "intent": one of ["lookup", "superlative", "aggregate", "compare_periods"],
   "crop": commodity name (crop, fertilizer type, livestock product, etc.) or null,
+  "crops": list of TWO OR MORE specific crop names, or null,
   "sector": sector/group name or null,
   "place": place name or null,
   "entity_type": one of ["national", "province", "district"] or null,
@@ -90,6 +91,12 @@ crop, so "total wheat area" is crop="Wheat", sector=null, despite there being a
 sector called "Maize and Wheat". Only use "sector" when the question names a
 GROUP that is not itself a single item in CROPS.
 
+Use "crops" (a list) instead of "crop" ONLY when the question names two or
+more SPECIFIC crops to be combined -- "combined production of maize and
+wheat". Do NOT use sector for this: sector="Cereal Crops" means ALL cereal
+crops (six of them), which is a different, larger number than just two named
+ones. Leave crop=null and sector=null when crops is used.
+
 Leaving crop=null means "the total across all items" -- only do that when the
 question really asks for a total.
 
@@ -107,28 +114,31 @@ PERIODS: {periods}
 Examples:
 
 Question: which province produced the most paddy in 2080/81
-{{"intent": "superlative", "crop": "Paddy", "place": null, "entity_type": "province", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
+{{"intent": "superlative", "crop": "Paddy", "crops": null, "place": null, "entity_type": "province", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
 
 Question: how much rice did Jhapa grow last year
-{{"intent": "lookup", "crop": "Paddy", "place": "JHAPA", "entity_type": "district", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+{{"intent": "lookup", "crop": "Paddy", "crops": null, "place": "JHAPA", "entity_type": "district", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: what was the total cereal production in 2080/81
-{{"intent": "aggregate", "crop": null, "sector": "Cereal Crops", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+{{"intent": "aggregate", "crop": null, "crops": null, "sector": "Cereal Crops", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: what was the total wheat area in Nepal in 2080/81
-{{"intent": "aggregate", "crop": "Wheat", "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Area", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+{{"intent": "aggregate", "crop": "Wheat", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Area", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Question: what's the combined production of maize and wheat in 2080/81
+{{"intent": "aggregate", "crop": null, "crops": ["Maize", "Wheat"], "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: which livestock category had the highest population in 2080/81
-{{"intent": "superlative", "crop": null, "sector": "Livestock", "place": "Nepal", "entity_type": "national", "measure": "Population", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
+{{"intent": "superlative", "crop": null, "crops": null, "sector": "Livestock", "place": "Nepal", "entity_type": "national", "measure": "Population", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
 
 Question: how many cattle were there in 2080/81
-{{"intent": "lookup", "crop": "CATTLE", "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Population", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+{{"intent": "lookup", "crop": "CATTLE", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Population", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: how much urea was sold in 2080/81
-{{"intent": "lookup", "crop": "Urea", "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Sales", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+{{"intent": "lookup", "crop": "Urea", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Sales", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
 
 Question: how did wheat production change from 2078/79 to 2080/81
-{{"intent": "compare_periods", "crop": "Wheat", "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+{{"intent": "compare_periods", "crop": "Wheat", "crops": null, "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "direction": null}}
 
 Measures vary by what is being counted. "Count" is the measure for numbers of
 things -- Tea Estates, Tea Small Farmers -- not quantities of them. "Population"
@@ -143,10 +153,33 @@ Estates", "Tea Small Farmers". Each of these is its own CROP, not a sector --
 means crop="Tea Estates" / crop="Tea Area" with sector=null, not sector="Tea".
 
 Question: which district has the most tea estates
-{{"intent": "superlative", "crop": "Tea Estates", "sector": null, "place": null, "entity_type": "district", "measure": "Count", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
+{{"intent": "superlative", "crop": "Tea Estates", "crops": null, "sector": null, "place": null, "entity_type": "district", "measure": "Count", "period": "2080/81 (2023/24)", "period_2": null, "direction": "max"}}
 
 Question: what is the total tea area in Ilam
-{{"intent": "lookup", "crop": "Tea Area", "sector": null, "place": "Ilam", "entity_type": "district", "measure": "Area", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+{{"intent": "lookup", "crop": "Tea Area", "crops": null, "sector": null, "place": "Ilam", "entity_type": "district", "measure": "Area", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Question: what's the total tea production
+{{"intent": "aggregate", "crop": "Tea", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Production", "period": "2080/81 (2023/24)", "period_2": null, "direction": null}}
+
+Nepal's ecological belts (Mountain, Hill, Terai) are also individual items in
+the CROPS list, under sector="Ecological Belt" -- treat a belt name exactly
+like a crop, not like a place. A question about a belt is entity_type="national",
+place="Nepal", crop=<the belt name>. This sector has no yearly breakdown, so
+period is always null for it, even for a question that would default to the
+latest year for a crop like Paddy.
+
+If the question names a year that is clearly NOT one of the listed PERIODS
+(e.g. a plain AD year like "1990" or "2005" that isn't close to any fiscal
+year in this dataset), leave "period" as your best literal guess of what the
+user typed, but do NOT silently substitute a different, unrelated year's
+data as if it answers the question -- validation downstream will reject an
+unmatched period and report it honestly instead.
+
+Question: what percentage of Nepal's area is Hill region
+{{"intent": "lookup", "crop": "Hill", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Percentage", "period": null, "period_2": null, "direction": null}}
+
+Question: how many square kilometers does the Terai belt cover
+{{"intent": "lookup", "crop": "Terai", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Area", "period": null, "period_2": null, "direction": null}}
 """
 
 
@@ -232,6 +265,22 @@ def validate_intent(intent, vocab, verbose=False):
         out["crop"] = matched
     else:
         out["crop"] = None
+
+    crops = intent.get("crops")
+    if crops:
+        matched_list = []
+        for c in crops:
+            m, how = vocab.match_crop(c)
+            if not m:
+                raise IntentError(
+                    f"Unknown crop {c!r} in crops list. Did you mean: {how}?" if how
+                    else f"Unknown crop {c!r} in crops list -- not present in this dataset.")
+            if verbose and how != "exact":
+                print(f"[validate] crops item: {how}")
+            matched_list.append(m)
+        out["crops"] = matched_list
+    else:
+        out["crops"] = None
 
     place = intent.get("place")
     if place:
