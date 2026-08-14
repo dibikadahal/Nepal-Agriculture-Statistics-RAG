@@ -16,7 +16,20 @@ Row-selection rules that matter for correctness:
     single named crop. An aggregate asks for the stated total row when
     one exists rather than re-summing parts (avoids double counting).
   - when a question names no period, the most recent one is used, and
-    the caller is told which -- see resolve_period().
+    the caller is told which -- see resolve_period(). EXCEPT for data
+    that has no period dimension at all (e.g. Ecological Belt -- every
+    row is period=NULL, a fixed breakdown, not a yearly series): forcing
+    the latest fiscal year onto that would never match anything, so
+    resolve_period() checks for this case first and returns None rather
+    than guessing a period that doesn't apply.
+  - a "crops" list (two or more SPECIFIC named crops, e.g. "combined
+    production of maize and wheat") is fundamentally different from a
+    sector total: the source PDF never states that combined figure, so
+    it can't be looked up as one stated row the way a sector's own
+    Total row can. Each crop's own stated national total is fetched
+    separately, and summed in PYTHON (in run_query, not here) -- never
+    left for the answer-writing model to add up, per this project's
+    core rule that the model only phrases numbers, never computes them.
 """
 import sqlite3
 
@@ -27,11 +40,29 @@ class QueryError(Exception):
     pass
 
 
-def resolve_period(intent, vocab):
+def resolve_period(conn, intent, vocab):
     """No period in the question -> use the most recent one available.
-    Returns (period, was_defaulted) so the answer can say which year it used."""
+    Returns (period, was_defaulted) so the answer can say which year it used.
+
+    First checks whether the named crop/sector has ANY period-bearing rows
+    at all. If every row for it is period=NULL (no yearly breakdown exists
+    in the source), defaulting to "latest year" would silently produce zero
+    matches -- return None instead and let the queries below match on
+    period IS NULL directly."""
     if intent.get("period"):
         return intent["period"], False
+
+    crop = intent.get("crop")
+    sector = intent.get("sector")
+    if crop or sector:
+        clause = "crop = ?" if crop else "sector = ?"
+        val = crop or sector
+        has_any_period = conn.execute(
+            f"SELECT COUNT(*) FROM {TABLE} WHERE {clause} AND period IS NOT NULL", [val]
+        ).fetchone()[0]
+        if not has_any_period:
+            return None, False   # this data has no period dimension -- don't force one
+
     if not vocab.periods:
         raise QueryError("No periods present in the dataset.")
     return sorted(vocab.periods)[-1], True
@@ -51,12 +82,14 @@ def q_lookup(conn, intent, period):
                value_num, source_table_id
         FROM {TABLE}
         WHERE measure = ?
-          AND period = ?
+          AND {'period = ?' if period is not None else 'period IS NULL'}
           AND {'entity_name = ?' if has_place else 'entity_type = "national"'}
           AND {'crop = ?' if intent['crop'] else 'crop_is_total = 1'}
         ORDER BY value_num DESC
     """
-    params = [intent["measure"], period]
+    params = [intent["measure"]]
+    if period is not None:
+        params.append(period)
     if has_place:
         params.append(intent["place"])
     if intent["crop"]:
@@ -93,7 +126,7 @@ def q_superlative(conn, intent, period):
                    unit, value_num, source_table_id
             FROM {TABLE}
             WHERE measure = ?
-              AND period = ?
+              AND {'period = ?' if period is not None else 'period IS NULL'}
               AND sector = ?
               AND crop IS NOT NULL
               AND crop_is_total = 0
@@ -103,7 +136,11 @@ def q_superlative(conn, intent, period):
             ORDER BY value_num {direction}
             LIMIT 5
         """
-        params = [intent["measure"], period, intent["sector"], scope]
+        params = [intent["measure"]]
+        if period is not None:
+            params.append(period)
+        params.append(intent["sector"])
+        params.append(scope)
         if place:
             params.append(place)
         rows = conn.execute(sql, params).fetchall()
@@ -117,14 +154,17 @@ def q_superlative(conn, intent, period):
                unit, value_num, source_table_id
         FROM {TABLE}
         WHERE measure = ?
-          AND period = ?
+          AND {'period = ?' if period is not None else 'period IS NULL'}
           AND entity_type = ?
           AND value_num > 0
           AND {'crop = ?' if intent['crop'] else 'crop_is_total = 1'}
         ORDER BY value_num {direction}
         LIMIT 5
     """
-    params = [intent["measure"], period, intent["entity_type"] or "province"]
+    params = [intent["measure"]]
+    if period is not None:
+        params.append(period)
+    params.append(intent["entity_type"] or "province")
     if intent["crop"]:
         params.append(intent["crop"])
     return conn.execute(sql, params).fetchall()
@@ -132,39 +172,77 @@ def q_superlative(conn, intent, period):
 
 def q_aggregate(conn, intent, period):
     """A total. Prefers the source's own stated total row over re-summing
-    parts -- the report's totals are authoritative and avoid double counting."""
+    parts -- the report's totals are authoritative and avoid double counting.
+
+    intent["crops"] (two+ specific named crops) is the one case where no
+    single stated row can answer the question -- fetches each crop's own
+    national total separately and returns all of them; run_query() sums
+    them in Python and records the result in meta, never here."""
     scope = intent.get("entity_type") or "national"
+    period_clause = "period = ?" if period is not None else "period IS NULL"
+
+    if intent.get("crops"):
+        rows = []
+        for c in intent["crops"]:
+            sql = f"""
+                SELECT entity_name, crop, sector, measure, period, unit, value_num, source_table_id
+                FROM {TABLE}
+                WHERE measure = ? AND {period_clause} AND crop = ? AND entity_type = ?
+                  AND geo_is_total = 1
+                ORDER BY value_num DESC LIMIT 1
+            """
+            params = [intent["measure"]]
+            if period is not None:
+                params.append(period)
+            params += [c, scope]
+            r = conn.execute(sql, params).fetchone()
+            if r:
+                rows.append(r)
+        return rows
+
     # A specific crop always beats a sector: "total wheat area" means wheat,
     # not the cereal sector, even when the model fills in both fields.
     if intent["crop"]:
         sql = f"""
             SELECT entity_name, crop, sector, measure, period, unit, value_num, source_table_id
             FROM {TABLE}
-            WHERE measure = ? AND period = ? AND crop = ? AND entity_type = ?
+            WHERE measure = ? AND {period_clause} AND crop = ? AND entity_type = ?
               AND geo_is_total = 1
             ORDER BY value_num DESC LIMIT 5
         """
-        rows = conn.execute(sql, [intent["measure"], period, intent["crop"], scope]).fetchall()
+        params = [intent["measure"]]
+        if period is not None:
+            params.append(period)
+        params += [intent["crop"], scope]
+        rows = conn.execute(sql, params).fetchall()
     elif intent.get("sector"):
         # a sector total ("all cereal crops") -- the stated all-crops total row
         # within tables belonging to that sector
         sql = f"""
             SELECT entity_name, crop, sector, measure, period, unit, value_num, source_table_id
             FROM {TABLE}
-            WHERE measure = ? AND period = ? AND entity_type = ? AND sector = ?
+            WHERE measure = ? AND {period_clause} AND entity_type = ? AND sector = ?
               AND crop_is_total = 1 AND geo_is_total = 1
             ORDER BY value_num DESC LIMIT 5
         """
-        rows = conn.execute(sql, [intent["measure"], period, scope, intent["sector"]]).fetchall()
+        params = [intent["measure"]]
+        if period is not None:
+            params.append(period)
+        params += [scope, intent["sector"]]
+        rows = conn.execute(sql, params).fetchall()
     else:
         sql = f"""
             SELECT entity_name, crop, sector, measure, period, unit, value_num, source_table_id
             FROM {TABLE}
-            WHERE measure = ? AND period = ? AND entity_type = ?
+            WHERE measure = ? AND {period_clause} AND entity_type = ?
               AND crop_is_total = 1 AND geo_is_total = 1
             ORDER BY value_num DESC LIMIT 5
         """
-        rows = conn.execute(sql, [intent["measure"], period, scope]).fetchall()
+        params = [intent["measure"]]
+        if period is not None:
+            params.append(period)
+        params.append(scope)
+        rows = conn.execute(sql, params).fetchall()
     return rows
 
 
@@ -206,7 +284,7 @@ def run_query(db_path, intent, vocab):
         return [a, b], {"kind": kind, "change": change, "pct_change": pct,
                         "period_defaulted": False}
 
-    period, defaulted = resolve_period(intent, vocab)
+    period, defaulted = resolve_period(conn, intent, vocab)
     meta = {"kind": kind, "period_used": period, "period_defaulted": defaulted}
 
     if kind == "lookup":
@@ -215,6 +293,19 @@ def run_query(db_path, intent, vocab):
         rows = q_superlative(conn, intent, period)
     elif kind == "aggregate":
         rows = q_aggregate(conn, intent, period)
+        if intent.get("crops") and rows:
+            # Multiple crops' stated national totals fetched separately in
+            # q_aggregate -- sum them here in Python, same discipline as
+            # compare_periods' change/pct_change above. The answer-writing
+            # model NEVER sees raw multi-crop rows without this: it is
+            # instructed to never compute a figure itself, so an unsummed
+            # total would either be left out of the answer or, worse, the
+            # model would attempt the addition itself despite the rule.
+            total = sum(r["value_num"] for r in rows)
+            units = {r["unit"] for r in rows if r["unit"]}
+            meta["computed_total"] = total
+            meta["computed_total_crops"] = intent["crops"]
+            meta["computed_total_unit"] = units.pop() if len(units) == 1 else None
     else:
         raise QueryError(f"Unhandled intent type {kind!r}")
 
@@ -226,10 +317,11 @@ def run_query(db_path, intent, vocab):
 def explain_empty(conn, intent, period):
     """Say WHY nothing matched, not just that nothing did.
 
-    Three very different situations look identical otherwise:
+    Four very different situations look identical otherwise:
       - the place genuinely doesn't have that crop recorded (real absence)
       - that measure isn't reported for that crop (e.g. no Yield column)
       - the source table isn't in METADATA yet (our coverage gap)
+      - this data has no period dimension at all (e.g. Ecological Belt)
     Narrowing the filters one at a time tells them apart.
     """
     crop = intent.get("crop")
@@ -268,14 +360,19 @@ def explain_empty(conn, intent, period):
         return (f"{crop} for {place} has no {measure} figure"
                 + (f" -- available: {', '.join(available)}." if available else "."))
 
-    if period:
-        other = [r[0] for r in conn.execute(
-            f"""SELECT DISTINCT period FROM {TABLE}
-                WHERE {'crop = ?' if crop else '1=1'}
-                  AND {'entity_name = ?' if place else '1=1'}""",
-            [v for v in (crop, place) if v])]
-        if other and period not in other:
-            return (f"Nothing for {described}. That combination is recorded for: "
-                    f"{', '.join(sorted(other))}.")
+    other = [r[0] for r in conn.execute(
+        f"""SELECT DISTINCT period FROM {TABLE}
+            WHERE {'crop = ?' if crop else '1=1'}
+              AND {'entity_name = ?' if place else '1=1'}""",
+        [v for v in (crop, place) if v])]
+    other_real = sorted(p for p in other if p is not None)
+
+    if not other_real and other:
+        return (f"{crop or described} has no yearly breakdown -- it isn't "
+                f"reported by period in this dataset.")
+
+    if period and other_real and period not in other_real:
+        return (f"Nothing for {described}. That combination is recorded for: "
+                f"{', '.join(other_real)}.")
 
     return f"Nothing matched {described}."
