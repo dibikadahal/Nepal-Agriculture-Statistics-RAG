@@ -10,8 +10,11 @@ Production, Yield) instead of hardcoding per-table column meanings.
 import re
 
 MEASURE_SYNONYMS = {
-    "area": "Area", "area (ha)": "Area", "ha": "Area",
+    "area": "Area", "area (ha)": "Area", "area (ha.)": "Area", "ha": "Area",
+    "area (square km.)": "Area",
+    "percentage": "Percentage",
     "production": "Production", "prod (mt.)": "Production", "prod": "Production", "prod.": "Production",
+    "production (mt.)": "Production",
     "mt": "Production", "mt.": "Production",
     "yield": "Yield", "yield (mt./ha)": "Yield", "yield(kg/ha)": "Yield", "mt/ha": "Yield",
 }
