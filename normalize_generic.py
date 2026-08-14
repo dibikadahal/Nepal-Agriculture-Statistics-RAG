@@ -12,6 +12,7 @@ from generic_melt import melt_table, expand_grid, drop_title_rows, BeautifulSoup
 from classify_entity import build_district_vocab, classify_entity
 from classify_column import classify_column_path
 from canonicalize import canonical_crop
+import re
 
 
 def _table_width(html):
@@ -74,8 +75,8 @@ METADATA = {
         sector="Cotton", period_default="2079/80 (2022/23)",
         crop_map={"__default__": "Cotton"}),
     "Statistical_Nepalese_Agriculture-9-45_p30_t37": dict(
-        sector="Cotton", period_default="2079/80 (2022/23)",
-        crop_map={"__default__": "Cotton"}),
+        sector="Rubber", period_default="2079/80 (2022/23)",
+        crop_map={"__default__": "Rubber"}),
 
     "Statistical_Nepalese_Agriculture-9-45_p32_t40": dict(
         sector="Tea", period_default="2080/81 (2023/24)",
@@ -210,9 +211,168 @@ METADATA = {
         sector="Cash Crops", measure_default="Production",
         row_is_period=True),
     "Statistical_Nepalese_Agriculture-9-45_p33_t41": dict(
-        sector="Mulberry", measure_default="Production",
-        row_is_period=True),
+        multi_table=True,
+        sub_tables=[
+            dict(sector="Mulberry", row_is_period=True,
+                 crop_map={"__default__": "Mulberry"},
+                 units={"Area": "hectares", "Production": "metric tonnes"}),
+
+            dict(sector="Mushroom", row_is_period=True,
+                 crop_map={
+                     "Fresh Mushroom Production (Mt.)": "Mushroom",
+                     "Mushroom Seed Production (Bottle)": "Mushroom Seed",
+                 },
+                 measure_by_crop={"Mushroom": "Production", "Mushroom Seed": "Production"},
+                 units_by_crop={"Mushroom": "metric tonnes", "Mushroom Seed": "bottles"}),
+            
+            dict(sector="Honey", row_is_period=True,
+                 crop_map={
+                     "Bee Hives (No.)": "Bee Hives",
+                     "__default__": "Honey",
+                 },
+                 measure_by_crop={"Bee Hives": "Count", "Honey": "Production"},
+                 units_by_crop={"Bee Hives": "hives", "Honey": "metric tonnes"}),
+        ]),
+
+    "Statistical_Nepalese_Agriculture-9-45_p1_t0": dict(
+        sector="Ecological Belt",
+        units={"Area": "square kilometers", "Percentage": "percent"}),
 }
+
+
+def _build_fact_rows(melted, meta, table_id, vocab):
+    """Takes already-melted rows + a metadata dict and returns the list of
+    classified fact-row dicts. Extracted unchanged from the main loop so
+    the multi_table path (see below) can reuse the exact same logic
+    instead of duplicating it."""
+    TOTAL_LABELS = {"total", "grand total", "totals", "sub total", "subtotal"}
+
+    # Classify every label once up front so we know, before the main loop,
+    # whether this table has a geography dimension at all (any label that
+    # resolved to a real district). That answers a question the per-row
+    # loop below can't answer on its own: does an unmatched row-type label
+    # mean "this table's rows are crop names" (true for a plain crop list,
+    # e.g. livestock categories) or "classify_entity couldn't resolve this
+    # particular row's geography" (true here -- a corrupted/garbled cell,
+    # e.g. two source rows fused into one: "Karnali Karnali"/"HUMLA JUMLA",
+    # or a province name duplicated into the district column). The two
+    # cases need opposite handling and look identical without this check.
+    entities = [classify_entity(m["label"], vocab) for m in melted]
+    has_district = any(e["entity_type"] == "district" for e in entities)
+
+    table_rows = []
+    for m, entity in zip(melted, entities):
+        if (has_district and entity["entity_type"] == "row"
+                and entity["entity_name"].strip().lower() not in TOTAL_LABELS):
+            continue  # unresolved geography in a geography table -- drop, don't fabricate a crop
+        col = classify_column_path(m["column_path"])
+        is_total_label = entity["entity_type"] == "row" and entity["entity_name"].strip().lower() in TOTAL_LABELS
+        col_qualifier = col["qualifiers"][0] if col["qualifiers"] else None
+        col_is_total = col_qualifier is not None and col_qualifier.strip().lower() in TOTAL_LABELS
+        if col_is_total:
+            crop = None                      # the column itself is a total
+        elif is_total_label and not col_qualifier:
+            crop = None                      # row total, and no crop in the column
+        elif (is_total_label and col_qualifier
+              and col_qualifier in (meta.get("crop_map") or {})):
+            # A grand-total row (e.g. Coffee's "Total" district row) paired
+            # with a column whose header the table's OWN crop_map already
+            # names explicitly (e.g. "Small Farmers (No.)") -- the column
+            # is the real crop, the row label just marks this as the
+            # whole-table total. Gated on an explicit crop_map hit (not
+            # "any non-empty qualifier") so this doesn't fire on tables
+            # where columns carry incidental, non-crop text (e.g. a title
+            # row a upstream cleanup step missed) -- there the row label
+            # below is still the right source of truth for the crop.
+            crop = col_qualifier
+        elif entity["entity_type"] == "row" and not meta.get("row_is_period"):
+            crop = entity["entity_name"]
+        else:
+            crop = col_qualifier
+            if crop is None:
+                # No group header at all above this column -- distinct from
+                # col_is_total/is_total_label above, which set crop=None on
+                # purpose for a real "Total" label. A blank qualifier only
+                # means something when crop_map spells out what blank means
+                # (e.g. an unlabelled middle column). Otherwise this is a
+                # corrupted/missing header cell with no attributable crop;
+                # inserting it as crop=None would silently fold unrelated
+                # data into the same bucket used for legitimate totals.
+                crop_map_here = meta.get("crop_map") or {}
+                if "" not in crop_map_here and "__default__" not in crop_map_here:
+                    continue
+        crop_map = meta.get("crop_map")
+        if crop_map and crop in crop_map:
+            crop = crop_map[crop]          # explicit mapping wins, skip canonicalization
+        else:
+            crop = canonical_crop(crop, known_districts=set(vocab.keys()))
+            if crop_map:
+                crop = crop_map.get(crop or "", crop_map.get("__default__", crop))
+
+        row_period_label = (re.sub(r"\s+", "", entity["entity_name"])
+                                 if entity["entity_type"] == "row" else None)
+
+        if entity["entity_type"] == "row":
+            # whole-table national-level rows (e.g. crop_year_metric) -- whether
+            # it was a real crop or a "Total" label, the geography here is Nepal
+            entity = dict(entity_type="national", entity_name="Nepal", entity_path="Nepal")
+
+        measure = (meta.get("measure_by_crop", {}).get(crop)
+                   or col["measure"] or meta.get("measure_default"))
+        if crop is not None and measure is None:
+            # A named crop with no resolvable measure means the header
+            # cell for this column was itself corrupted (e.g. two sub-
+            # column headers fused into one, "Production Yield") -- we
+            # can't tell what quantity the value represents. Inserting it
+            # anyway would create a fact with a meaningless NULL measure
+            # that no real question can match, and it would silently
+            # merge with any other unresolved column under the same
+            # crop. Drop it instead of guessing.
+            continue
+
+        table_rows.append(dict(
+            entity_type=entity["entity_type"], entity_name=entity["entity_name"],
+            entity_path=entity["entity_path"], crop=crop, sector=meta["sector"],
+            measure=measure,
+            unit=(meta.get("units_by_crop_measure", {}).get((crop, measure))
+                  or meta.get("units_by_crop", {}).get(crop)
+                  or meta.get("units", {}).get(measure)),
+            period=(row_period_label if meta.get("row_is_period")
+                    else (col["period"] or meta.get("period_default"))),
+            value_num=m["value"], source_table_id=table_id,
+        ))
+
+    for r in table_rows:
+        r["geo_is_total"] = r["entity_type"] == "national" or (r["entity_type"] == "province" and has_district)
+        r["crop_is_total"] = r["crop"] is None
+    return table_rows
+
+
+def _split_subtable_grid(grid):
+    """Splits a grid at embedded caption rows ('Table 2.11 : ...' etc.) --
+    used only for raw tables where Docling fused multiple logically
+    separate tables into one HTML <table>. Each returned segment starts
+    with its own header row (the row immediately following the caption,
+    which restates that section's real column headers)."""
+    caption_idxs = [i for i, row in enumerate(grid)
+                     if row and row[0].strip().lower().startswith("table ")]
+    boundaries = [0]
+    for idx in caption_idxs:
+        boundaries.append(idx)
+        boundaries.append(idx + 1)
+    boundaries.append(len(grid))
+    return [grid[boundaries[i]:boundaries[i + 1]]
+            for i in range(0, len(boundaries) - 1, 2)]
+
+
+def _grid_to_html(sub_grid):
+    """Reconstructs a standalone <table> from a grid segment so it can be
+    fed back through the normal melt_table(html) path unchanged."""
+    rows_html = "".join(
+        "<tr>" + "".join(f"<td>{cell}</td>" for cell in row) + "</tr>"
+        for row in sub_grid
+    )
+    return f"<table><tbody>{rows_html}</tbody></table>"
 
 
 def normalize_generic(raw_db_path, fact_db_path):
@@ -232,6 +392,23 @@ def normalize_generic(raw_db_path, fact_db_path):
     all_facts = []
 
     for table_id, meta in METADATA.items():
+        if meta.get("multi_table"):
+            row = raw_conn.execute("SELECT html_content FROM raw_tables WHERE table_id=?", (table_id,)).fetchone()
+            if not row:
+                continue
+            grid = drop_title_rows(expand_grid(BeautifulSoup(row[0], "html.parser").find("table")))
+            segments = _split_subtable_grid(grid)
+            if len(segments) != len(meta["sub_tables"]):
+                print(f"  [WARN] {table_id}: expected {len(meta['sub_tables'])} sub-tables, "
+                      f"found {len(segments)} -- skipping, check source HTML")
+                continue
+            for seg_grid, sub_meta in zip(segments, meta["sub_tables"]):
+                sub_melted, _ = melt_table(_grid_to_html(seg_grid))
+                sub_rows = _build_fact_rows(sub_melted, sub_meta, table_id, vocab)
+                print(f"  [OK] {table_id} / {sub_meta['sector']}: {len(sub_rows)} fact rows")
+                all_facts.extend(sub_rows)
+            continue  # skip the normal single-table path entirely for this id
+
         ids = [table_id] + meta.get("extra_table_ids", [])
         html_parts = []
         for tid in ids:
@@ -267,102 +444,7 @@ def normalize_generic(raw_db_path, fact_db_path):
             for html_part in html_parts:
                 part_melted, _ = melt_table(html_part)
                 melted.extend(part_melted)
-        TOTAL_LABELS = {"total", "grand total", "totals", "sub total", "subtotal"}
-
-        # Classify every label once up front so we know, before the main loop,
-        # whether this table has a geography dimension at all (any label that
-        # resolved to a real district). That answers a question the per-row
-        # loop below can't answer on its own: does an unmatched row-type label
-        # mean "this table's rows are crop names" (true for a plain crop list,
-        # e.g. livestock categories) or "classify_entity couldn't resolve this
-        # particular row's geography" (true here -- a corrupted/garbled cell,
-        # e.g. two source rows fused into one: "Karnali Karnali"/"HUMLA JUMLA",
-        # or a province name duplicated into the district column). The two
-        # cases need opposite handling and look identical without this check.
-        entities = [classify_entity(m["label"], vocab) for m in melted]
-        has_district = any(e["entity_type"] == "district" for e in entities)
-
-        table_rows = []
-        for m, entity in zip(melted, entities):
-            if (has_district and entity["entity_type"] == "row"
-                    and entity["entity_name"].strip().lower() not in TOTAL_LABELS):
-                continue  # unresolved geography in a geography table -- drop, don't fabricate a crop
-            col = classify_column_path(m["column_path"])
-            is_total_label = entity["entity_type"] == "row" and entity["entity_name"].strip().lower() in TOTAL_LABELS
-            col_qualifier = col["qualifiers"][0] if col["qualifiers"] else None
-            col_is_total = col_qualifier is not None and col_qualifier.strip().lower() in TOTAL_LABELS
-            if col_is_total:
-                crop = None                      # the column itself is a total
-            elif is_total_label and not col_qualifier:
-                crop = None                      # row total, and no crop in the column
-            elif (is_total_label and col_qualifier
-                  and col_qualifier in (meta.get("crop_map") or {})):
-                # A grand-total row (e.g. Coffee's "Total" district row) paired
-                # with a column whose header the table's OWN crop_map already
-                # names explicitly (e.g. "Small Farmers (No.)") -- the column
-                # is the real crop, the row label just marks this as the
-                # whole-table total. Gated on an explicit crop_map hit (not
-                # "any non-empty qualifier") so this doesn't fire on tables
-                # where columns carry incidental, non-crop text (e.g. a title
-                # row a upstream cleanup step missed) -- there the row label
-                # below is still the right source of truth for the crop.
-                crop = col_qualifier
-            elif entity["entity_type"] == "row":
-                crop = entity["entity_name"]
-            else:
-                crop = col_qualifier
-                if crop is None:
-                    # No group header at all above this column -- distinct from
-                    # col_is_total/is_total_label above, which set crop=None on
-                    # purpose for a real "Total" label. A blank qualifier only
-                    # means something when crop_map spells out what blank means
-                    # (e.g. an unlabelled middle column). Otherwise this is a
-                    # corrupted/missing header cell with no attributable crop;
-                    # inserting it as crop=None would silently fold unrelated
-                    # data into the same bucket used for legitimate totals.
-                    crop_map_here = meta.get("crop_map") or {}
-                    if "" not in crop_map_here and "__default__" not in crop_map_here:
-                        continue
-            crop_map = meta.get("crop_map")
-            if crop_map and crop in crop_map:
-                crop = crop_map[crop]          # explicit mapping wins, skip canonicalization
-            else:
-                crop = canonical_crop(crop, known_districts=set(vocab.keys()))
-                if crop_map:
-                    crop = crop_map.get(crop or "", crop_map.get("__default__", crop))
-            
-            if entity["entity_type"] == "row":
-                # whole-table national-level rows (e.g. crop_year_metric) -- whether
-                # it was a real crop or a "Total" label, the geography here is Nepal
-                entity = dict(entity_type="national", entity_name="Nepal", entity_path="Nepal")
-
-            measure = (meta.get("measure_by_crop", {}).get(crop)
-                       or col["measure"] or meta.get("measure_default"))
-            if crop is not None and measure is None:
-                # A named crop with no resolvable measure means the header
-                # cell for this column was itself corrupted (e.g. two sub-
-                # column headers fused into one, "Production Yield") -- we
-                # can't tell what quantity the value represents. Inserting it
-                # anyway would create a fact with a meaningless NULL measure
-                # that no real question can match, and it would silently
-                # merge with any other unresolved column under the same
-                # crop. Drop it instead of guessing.
-                continue
-
-            table_rows.append(dict(
-                entity_type=entity["entity_type"], entity_name=entity["entity_name"],
-                entity_path=entity["entity_path"], crop=crop, sector=meta["sector"],
-                measure=measure,
-                unit=(meta.get("units_by_crop_measure", {}).get((crop, measure))
-                      or meta.get("units_by_crop", {}).get(crop)
-                      or meta.get("units", {}).get(measure)),
-                period=col["period"] or meta.get("period_default"),
-                value_num=m["value"], source_table_id=table_id,
-            ))
-
-        for r in table_rows:
-            r["geo_is_total"] = r["entity_type"] == "national" or (r["entity_type"] == "province" and has_district)
-            r["crop_is_total"] = r["crop"] is None
+        table_rows = _build_fact_rows(melted, meta, table_id, vocab)
         print(f"  [OK] {table_id}: {len(table_rows)} fact rows")
         all_facts.extend(table_rows)
 
