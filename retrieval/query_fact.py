@@ -30,6 +30,14 @@ Row-selection rules that matter for correctness:
     separately, and summed in PYTHON (in run_query, not here) -- never
     left for the answer-writing model to add up, per this project's
     core rule that the model only phrases numbers, never computes them.
+  - a superlative asking WHICH YEAR something was highest/lowest (rather
+    than which place or which item) ranks across a single crop/measure's
+    own yearly history at one fixed place -- a fundamentally different
+    axis from the other two superlative cases, so it's handled as its
+    own branch (entity_type == "period") rather than falling through to
+    place-ranking, which would silently answer a different question
+    (confirmed live: "which year had the highest maize yield" was
+    ranking provinces for one fixed year instead of ranking years).
 """
 import sqlite3
 
@@ -98,19 +106,49 @@ def q_lookup(conn, intent, period):
 
 
 def q_superlative(conn, intent, period):
-    """Two kinds of superlative, distinguished by what's being ranked:
+    """Three kinds of superlative, distinguished by what's being ranked:
 
-    1. Ranking ITEMS within a sector -- "which fertilizer sold most",
+    1. Ranking across YEARS for one fixed crop/measure/place -- "which
+       year had the highest maize yield". Signalled by entity_type="period"
+       (set by extract_intent when the question asks "which year"/"in
+       which year", never guessed here). Ranks a crop's own history; period
+       itself is deliberately NOT filtered to one value, unlike every other
+       query in this file.
+
+    2. Ranking ITEMS within a sector -- "which fertilizer sold most",
        "which cereal crop had the highest production". Signalled by a sector
        with no specific crop. Ranks crops, excluding the sector's own total row.
 
-    2. Ranking PLACES -- "which province produced the most paddy". Ranks
+    3. Ranking PLACES -- "which province produced the most paddy". Ranks
        provinces or districts, excluding stated geographic total rows so the
        Nepal row never outranks the provinces it sums.
     """
     direction = "DESC" if intent.get("direction", "max") == "max" else "ASC"
 
-    # case 1: rank items within a sector
+    # case 1: rank across years for one crop
+    if intent.get("entity_type") == "period":
+        if not intent.get("crop"):
+            raise QueryError(
+                "Ranking across years needs a specific crop or item -- "
+                "try naming one (e.g. 'which year had the highest maize yield').")
+        scope = "national"
+        place = intent.get("place") or "Nepal"
+        sql = f"""
+            SELECT entity_name, entity_path, crop, sector, measure, period,
+                   unit, value_num, source_table_id
+            FROM {TABLE}
+            WHERE measure = ? AND crop = ? AND entity_type = ?
+              AND entity_name = ? AND period IS NOT NULL AND value_num > 0
+            ORDER BY value_num {direction}
+            LIMIT 5
+        """
+        rows = conn.execute(sql, [intent["measure"], intent["crop"], scope, place]).fetchall()
+        if not rows:
+            raise QueryError(
+                f"No {intent['crop']} {intent['measure']} data found across years for {place}.")
+        return rows
+
+    # case 2: rank items within a sector
     if intent.get("sector") and not intent.get("crop"):
         # Scope to ONE geography, defaulting to national. Without this the
         # ranking mixes district rows with national ones and "lowest" finds
@@ -144,11 +182,21 @@ def q_superlative(conn, intent, period):
         if place:
             params.append(place)
         rows = conn.execute(sql, params).fetchall()
+        rows = conn.execute(sql, params).fetchall()
         if rows:
             return rows
-        # fall through to place-ranking if the sector had no rankable items
+        # Only fall through to place-ranking (case 3) when the question
+        # actually asked to rank PLACES (province/district) -- falling
+        # through when entity_type is "national" or "period" produces a
+        # meaningless ranking with no sector filter, which surfaced
+        # unrelated sector totals for a Honey query that hit this path
+        # by mistake. Refuse cleanly instead of guessing.
+        if scope not in ("province", "district"):
+            raise QueryError(
+                f"No rankable {intent['sector']} items found for {place or scope} "
+                f"at that period.")
 
-    # case 2: rank places
+    # case 3: rank places
     sql = f"""
         SELECT entity_name, entity_path, crop, sector, measure, period,
                unit, value_num, source_table_id
