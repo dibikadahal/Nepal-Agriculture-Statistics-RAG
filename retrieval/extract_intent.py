@@ -41,7 +41,7 @@ Schema:
   "crops": list of TWO OR MORE specific crop names, or null,
   "sector": sector/group name or null,
   "place": place name or null,
-  "entity_type": one of ["national", "province", "district"] or null,
+  "entity_type": one of ["national", "province", "district", "period"] or null,
   "measure": one of ["Area", "Production", "Yield", "Count", "Population", "Sales"] or null,
   "period": period string or null,
   "period_2": second period (only for compare_periods) or null,
@@ -99,6 +99,20 @@ ones. Leave crop=null and sector=null when crops is used.
 
 Leaving crop=null means "the total across all items" -- only do that when the
 question really asks for a total.
+
+If a superlative question asks WHICH YEAR/PERIOD something was highest or
+lowest ("which year had the highest maize yield", "in which year was honey
+production highest"), set entity_type="period" instead of defaulting to
+"province" or "district" -- this ranks across the crop's own yearly history
+at one fixed place, rather than ranking places for one fixed year. This
+ALWAYS needs a specific crop (leave sector null); leave period null too,
+since the whole point is to search across every year, not one.
+
+Question: which year had the highest maize yield
+{{"intent": "superlative", "crop": "Maize", "crops": null, "sector": null, "place": null, "entity_type": "period", "measure": "Yield", "period": null, "period_2": null, "direction": "max"}}
+
+Question: in which year was honey production highest
+{{"intent": "superlative", "crop": "Honey", "crops": null, "sector": null, "place": null, "entity_type": "period", "measure": "Production", "period": null, "period_2": null, "direction": "max"}}
 
 ONLY use values from these lists. If the question mentions something not in
 these lists, put the user's original word in the field anyway -- validation
@@ -168,6 +182,15 @@ place="Nepal", crop=<the belt name>. This sector has no yearly breakdown, so
 period is always null for it, even for a question that would default to the
 latest year for a crop like Paddy.
 
+Question: what percentage of Nepal's area is Hill region
+{{"intent": "lookup", "crop": "Hill", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Percentage", "period": null, "period_2": null, "direction": null}}
+
+Question: how many square kilometers does the Terai belt cover
+{{"intent": "lookup", "crop": "Terai", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Area", "period": null, "period_2": null, "direction": null}}
+
+Question: how did cattle population change from 2078/79 to 2080/81
+{{"intent": "compare_periods", "crop": "CATTLE", "crops": null, "place": "Nepal", "entity_type": "national", "measure": "Population", "period": "2078/79 (2021/22)", "period_2": "2080/81 (2023/24)", "direction": null}}
+
 If the question names a year that is clearly NOT one of the listed PERIODS
 (e.g. a plain AD year like "1990" or "2005" that isn't close to any fiscal
 year in this dataset), leave "period" as your best literal guess of what the
@@ -175,11 +198,14 @@ user typed, but do NOT silently substitute a different, unrelated year's
 data as if it answers the question -- validation downstream will reject an
 unmatched period and report it honestly instead.
 
-Question: what percentage of Nepal's area is Hill region
-{{"intent": "lookup", "crop": "Hill", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Percentage", "period": null, "period_2": null, "direction": null}}
+Some names match BOTH a crop and a sector (e.g. "Honey" is a sector
+containing "Bee Hives"/"Honey" crops, but "Honey" is also a crop in its
+own right). When the question asks about that ONE named thing's own
+history or ranking -- not "which item within X sector" -- always use
+crop, never sector, even though the name also happens to be a sector.
 
-Question: how many square kilometers does the Terai belt cover
-{{"intent": "lookup", "crop": "Terai", "crops": null, "sector": null, "place": "Nepal", "entity_type": "national", "measure": "Area", "period": null, "period_2": null, "direction": null}}
+Question: in which year was honey production highest
+{{"intent": "superlative", "crop": "Honey", "crops": null, "sector": null, "place": "Nepal", "entity_type": "period", "measure": "Production", "period": null, "period_2": null, "direction": "max"}}
 """
 
 
@@ -292,12 +318,32 @@ def validate_intent(intent, vocab, verbose=False):
         if verbose and how != "exact":
             print(f"[validate] place: {how}")
         out["place"] = matched
-        out["entity_type"] = etype     # trust the vocabulary over the model here
+        # "period" means ranking across years -- vocab.match_place can only
+        # ever return national/province/district, so overwriting a real
+        # entity_type="period" from the model with the place's geography
+        # type would silently turn a year-ranking question into a
+        # place-ranking one (confirmed live: Honey's entity_type="period"
+        # was clobbered back to "national" here, purely because the model
+        # also filled in place="Nepal", causing it to rank one fixed year
+        # across places instead of ranking years). Only trust the
+        # vocabulary's geography type when the model wasn't already asking
+        # for period-ranking -- and when it WAS, still explicitly set
+        # entity_type="period" here, otherwise it never lands in `out` at
+        # all and every downstream intent["entity_type"] lookup KeyErrors.
+        if intent.get("entity_type") != "period":
+            out["entity_type"] = etype
+        else:
+            out["entity_type"] = "period"
     else:
         out["place"] = None
         etype = intent.get("entity_type")
-        if etype and etype not in vocab.entity_types:
-            raise IntentError(f"Unknown entity_type {etype!r}; expected one of {vocab.entity_types}")
+        # "period" is a valid entity_type for ranking across years (see
+        # q_superlative case 1) but never comes from the DB-harvested
+        # vocab.entity_types list, so it needs an explicit allowance here.
+        if etype and etype not in vocab.entity_types and etype != "period":
+            raise IntentError(
+                f"Unknown entity_type {etype!r}; expected one of "
+                f"{list(vocab.entity_types) + ['period']}")
         out["entity_type"] = etype
 
       # The model fills "place" inconsistently -- it wrote "Nepal" for hen eggs
@@ -306,6 +352,10 @@ def validate_intent(intent, vocab, verbose=False):
         out["place"] = "Nepal"
 
     sector = intent.get("sector")
+    if isinstance(sector, list):
+        raise IntentError(
+            "Comparing two sectors at once isn't supported yet -- try asking "
+            "about one sector at a time (e.g. 'total cereal production in 2080/81').")
     if sector:
         matched, how = vocab.match_sector(sector)
         if not matched:
