@@ -12,7 +12,7 @@ import sqlite3
 
 parser = argparse.ArgumentParser()
 parser.add_argument("table_fragment", help="e.g. p9_t15")
-parser.add_argument("--db", default="fact.db")
+parser.add_argument("--db", default="data/fact.db")
 parser.add_argument("--entity", help="filter to one entity_name, e.g. JHAPA")
 args = parser.parse_args()
 

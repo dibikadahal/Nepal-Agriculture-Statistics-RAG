@@ -13,6 +13,10 @@ Usage:
 """
 import argparse
 import sqlite3
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "normalization"))
 from generic_melt import melt_table
 from classify_entity import build_district_vocab, classify_entity
 
@@ -92,7 +96,7 @@ def main(raw_db_path, fact_db_path):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw-db", default="raw_tables.db")
-    parser.add_argument("--fact-db", default="fact.db")
+    parser.add_argument("--raw-db", default="data/raw_tables.db")
+    parser.add_argument("--fact-db", default="data/fact.db")
     args = parser.parse_args()
     main(args.raw_db, args.fact_db)

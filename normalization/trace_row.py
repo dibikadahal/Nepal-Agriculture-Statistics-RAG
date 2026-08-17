@@ -19,8 +19,8 @@ from bs4 import BeautifulSoup
 parser = argparse.ArgumentParser()
 parser.add_argument("table_fragment")
 parser.add_argument("--match", required=True, help="substring of the row label to trace")
-parser.add_argument("--raw-db", default="raw_tables.db")
-parser.add_argument("--fact-db", default="fact.db")
+parser.add_argument("--raw-db", default="data/raw_tables.db")
+parser.add_argument("--fact-db", default="data/fact.db")
 args = parser.parse_args()
 
 conn = sqlite3.connect(args.raw_db)

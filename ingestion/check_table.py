@@ -11,7 +11,7 @@ import sqlite3
 
 parser = argparse.ArgumentParser()
 parser.add_argument("table_id_fragment", help="substring to match against table_id, e.g. p6_t12")
-parser.add_argument("--db", default="raw_tables.db")
+parser.add_argument("--db", default="data/raw_tables.db")
 args = parser.parse_args()
 
 conn = sqlite3.connect(args.db)

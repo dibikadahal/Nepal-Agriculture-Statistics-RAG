@@ -5,10 +5,14 @@ Usage:
     python test_vocabulary.py --db fact.db
 """
 import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "retrieval"))
 from vocabulary import Vocabulary
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--db", default="fact.db")
+parser.add_argument("--db", default="data/fact.db")
 args = parser.parse_args()
 
 v = Vocabulary(args.db)

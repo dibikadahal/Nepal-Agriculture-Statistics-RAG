@@ -119,8 +119,8 @@ QUESTIONS = [
 ]
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--db", default="fact.db")
-parser.add_argument("--raw-db", default="raw_tables.db")
+parser.add_argument("--db", default="data/fact.db")
+parser.add_argument("--raw-db", default="data/raw_tables.db")
 parser.add_argument("--model", default="qwen2.5:7b-instruct")
 args = parser.parse_args()
 

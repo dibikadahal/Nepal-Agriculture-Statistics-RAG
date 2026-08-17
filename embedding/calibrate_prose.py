@@ -10,6 +10,10 @@ Usage:
     python calibrate_prose.py --chroma-dir chroma_store
 """
 import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "retrieval"))
 from query_prose import retrieve
 
 SHOULD_MATCH = [
@@ -28,7 +32,7 @@ SHOULD_NOT_MATCH = [
 ]
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--chroma-dir", default="chroma_store")
+parser.add_argument("--chroma-dir", default="data/chroma_store")
 parser.add_argument("-n", type=int, default=3)
 args = parser.parse_args()
 

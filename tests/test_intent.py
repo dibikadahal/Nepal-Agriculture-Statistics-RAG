@@ -9,11 +9,15 @@ Usage:
     python test_intent.py --db fact.db -q "your own question here"
 """
 import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "retrieval"))
 from vocabulary import Vocabulary
 from extract_intent import extract_intent, IntentError
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--db", default="fact.db")
+parser.add_argument("--db", default="data/fact.db")
 parser.add_argument("--model", default="qwen2.5:7b-instruct")
 parser.add_argument("-v", "--verbose", action="store_true")
 parser.add_argument("-q", "--question", help="ask a single custom question")

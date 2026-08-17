@@ -24,8 +24,11 @@ Usage:
 import argparse
 import json
 import sqlite3
+import sys
 import urllib.request
+from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "ingestion"))
 from strip_tables import strip_tables
 
 OLLAMA_EMBED_URL = "http://localhost:11434/api/embeddings"
@@ -140,8 +143,8 @@ def build(raw_db, chroma_dir, chunk_size, verbose=False):
 
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
-    p.add_argument("--raw-db", default="raw_tables.db")
-    p.add_argument("--chroma-dir", default="chroma_store")
+    p.add_argument("--raw-db", default="data/raw_tables.db")
+    p.add_argument("--chroma-dir", default="data/chroma_store")
     p.add_argument("--chunk-size", type=int, default=1000)
     p.add_argument("-v", "--verbose", action="store_true")
     args = p.parse_args()

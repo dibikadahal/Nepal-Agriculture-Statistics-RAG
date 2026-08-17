@@ -11,6 +11,10 @@ and passed in as text, so even derived numbers never originate from the
 model. Multi-crop totals (query_fact.run_query, the "crops" intent case)
 follow the same rule: summed in Python, handed over as a ready-made line.
 """
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "retrieval"))
 from extract_intent import call_ollama
 
 ANSWER_SYSTEM = """You write one or two plain sentences answering a question about Nepali agriculture statistics.

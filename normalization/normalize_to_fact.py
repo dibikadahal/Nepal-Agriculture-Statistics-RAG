@@ -310,8 +310,8 @@ def normalize(raw_db_path: str, fact_db_path: str):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--raw-db", default="raw_tables.db")
-    parser.add_argument("--fact-db", default="fact.db")
+    parser.add_argument("--raw-db", default="data/raw_tables.db")
+    parser.add_argument("--fact-db", default="data/fact.db")
     args = parser.parse_args()
     print(f"Normalizing {args.raw_db} -> {args.fact_db}\n")
     normalize(args.raw_db, args.fact_db)

@@ -463,7 +463,7 @@ def normalize_generic(raw_db_path, fact_db_path):
 if __name__ == "__main__":
     import argparse
     p = argparse.ArgumentParser()
-    p.add_argument("--raw-db", default="raw_tables.db")
-    p.add_argument("--fact-db", default="fact.db")
+    p.add_argument("--raw-db", default="data/raw_tables.db")
+    p.add_argument("--fact-db", default="data/fact.db")
     args = p.parse_args()
     normalize_generic(args.raw_db, args.fact_db)

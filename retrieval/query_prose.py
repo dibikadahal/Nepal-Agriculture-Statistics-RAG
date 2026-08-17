@@ -23,6 +23,10 @@ Expect many prose questions to legitimately return "not found" -- that
 reflects the document, not a bug.
 """
 import re
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "embedding"))
 from embed_pages import embed_text, COLLECTION
 from extract_intent import call_ollama
 
@@ -39,7 +43,7 @@ Hard rules:
 DEFAULT_MAX_DISTANCE = 379.0   # tuned to this store; see calibrate_threshold()
 
 
-def retrieve(question, chroma_dir="chroma_store", n_results=4):
+def retrieve(question, chroma_dir="data/chroma_store", n_results=4):
     import chromadb
     client = chromadb.PersistentClient(path=chroma_dir)
     collection = client.get_collection(COLLECTION)
@@ -74,7 +78,7 @@ def check_numbers_grounded(reply, passages_text):
     return ungrounded
 
 
-def answer_from_prose(question, chroma_dir="chroma_store", model="qwen2.5:7b-instruct",
+def answer_from_prose(question, chroma_dir="data/chroma_store", model="qwen2.5:7b-instruct",
                       n_results=4, max_distance=DEFAULT_MAX_DISTANCE, verbose=False):
     hits = retrieve(question, chroma_dir=chroma_dir, n_results=n_results)
 
@@ -116,7 +120,7 @@ Answer:"""
     return reply, relevant
 
 
-def calibrate_threshold(chroma_dir="chroma_store", model="qwen2.5:7b-instruct"):
+def calibrate_threshold(chroma_dir="data/chroma_store", model="qwen2.5:7b-instruct"):
     """Print distances for questions the store SHOULD and SHOULD NOT answer,
     so max_distance can be set from evidence rather than guesswork."""
     probes = [

@@ -75,6 +75,6 @@ def build_raw_documents(db_path: str) -> None:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--db", default="raw_tables.db")
+    parser.add_argument("--db", default="data/raw_tables.db")
     args = parser.parse_args()
     build_raw_documents(args.db)

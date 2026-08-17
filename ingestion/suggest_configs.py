@@ -96,7 +96,7 @@ def suggest(db_path: str, known_table_ids: set):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--db", default="raw_tables.db")
+    parser.add_argument("--db", default="data/raw_tables.db")
     args = parser.parse_args()
     # table_ids already hand-configured in normalize_to_fact.py -- skip these
     already_done = {

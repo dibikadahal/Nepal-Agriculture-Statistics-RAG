@@ -1,5 +1,5 @@
 import sqlite3
-conn = sqlite3.connect("fact.db")   # change filename if yours is named differently
+conn = sqlite3.connect("data/fact.db")   # change filename if yours is named differently
 
 print("--- Mulberry 2022 ---")
 for r in conn.execute("SELECT crop, measure, period, value_num FROM fact_generic WHERE sector='Mulberry' AND period LIKE '2022%'"):

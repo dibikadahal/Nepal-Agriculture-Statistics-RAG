@@ -105,6 +105,6 @@ def validate(db_path: str):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--db", default="fact.db")
+    parser.add_argument("--db", default="data/fact.db")
     args = parser.parse_args()
     validate(args.db)

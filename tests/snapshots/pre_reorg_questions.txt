@@ -1,0 +1,413 @@
+======================================================================
+Q1: how much paddy did Jhapa produce in 2080/81
+----------------------------------------------------------------------
+Jhapa produced 477,462 metric tonnes of paddy in 2080/81.
+
+Source: page 9 (Statistical_Nepalese_Agriculture-9-45_p9_t15)
+
+======================================================================
+Q2: what was the maize yield in Kaski district in 2080/81
+----------------------------------------------------------------------
+2.93 metric tonnes per hectare (2080/81)
+
+Source: page 13 (Statistical_Nepalese_Agriculture-9-45_p13_t19)
+
+======================================================================
+Q3: how much wheat area was there in Kailali in 2080/81
+----------------------------------------------------------------------
+34,840 hectares
+
+Source: page 13 (Statistical_Nepalese_Agriculture-9-45_p13_t19)
+
+======================================================================
+Q4: how many tea estates are there in Ilam
+----------------------------------------------------------------------
+36 estates (2080/81 (2023/24))
+
+Source: page 32 (Statistical_Nepalese_Agriculture-9-45_p32_t40) -- Table 2.9:  Tea by Districts and by Types , Fiscal Year 2080/81(2023/24)
+
+======================================================================
+Q5: how much rubber was produced in Jhapa in 2079/80
+----------------------------------------------------------------------
+173 metric tonnes (2079/80 (2022/23))
+
+Source: page 30 (Statistical_Nepalese_Agriculture-9-45_p30_t37)
+
+======================================================================
+Q6: how many coffee small farmers are in Kaski
+----------------------------------------------------------------------
+The number of coffee small farmers in Kaski is 4,305 farmers for the fiscal year 2080/81 (2023/24).
+
+Source: page 30 (Statistical_Nepalese_Agriculture-9-45_p30_t38)
+
+======================================================================
+Q7: what was the millet production in Taplejung in 2080/81
+----------------------------------------------------------------------
+The millet production in Taplejung in 2080/81 was 4,270 metric tonnes.
+
+Source: page 15 (Statistical_Nepalese_Agriculture-9-45_p15_t21) -- Table 1.6: Millet-Barley-Buckwheat by Districts, Fiscal Year 2080/81 (2023/24)
+
+======================================================================
+Q8: how much maize did Bagmati produce in 2080/81
+----------------------------------------------------------------------
+Bagmati produced 656,510 metric tonnes of maize in 2080/81.
+
+Source: page 6 (Statistical_Nepalese_Agriculture-9-45_p6_t12)
+
+======================================================================
+Q9: how much sugarcane did Madhesh produce
+----------------------------------------------------------------------
+Madhesh produced 1,674,584 metric tonnes of sugarcane in the fiscal year 2080/81 (2023/24).
+
+Source: page 20 (Statistical_Nepalese_Agriculture-9-45_p20_t25)
+
+======================================================================
+Q10: how much oilseed did Gandaki produce in 2080/81
+----------------------------------------------------------------------
+Gandaki produced 8,526 metric tonnes of oilseeds in 2080/81.
+
+Source: page 20 (Statistical_Nepalese_Agriculture-9-45_p20_t25)
+
+======================================================================
+Q11: what was the potato production in Karnali in 2080/81
+----------------------------------------------------------------------
+The potato production in Karnali in 2080/81 was 212,702 metric tonnes.
+
+Source: page 20 (Statistical_Nepalese_Agriculture-9-45_p20_t25)
+
+======================================================================
+Q12: how much potato was produced in Nepal in 2080/81
+----------------------------------------------------------------------
+3,521,794 metric tonnes
+
+Source: page 1 (Statistical_Nepalese_Agriculture-9-45_p1_t3)
+
+======================================================================
+Q13: what area was under barley in 2080/81
+----------------------------------------------------------------------
+18,599 hectares
+
+Source: page 1 (Statistical_Nepalese_Agriculture-9-45_p1_t2)
+
+======================================================================
+Q14: how many cattle were there in 2080/81
+----------------------------------------------------------------------
+The number of cattle in 2080/81 was 5,198,388 animals.
+
+Source: page 2 (Statistical_Nepalese_Agriculture-9-45_p2_t7)
+
+======================================================================
+Q15: how much urea was sold in 2080/81
+----------------------------------------------------------------------
+259,542 tonnes of urea were sold in 2080/81.
+
+Source: page 3 (Statistical_Nepalese_Agriculture-9-45_p3_t10)
+
+======================================================================
+Q16: what percentage of Nepal's area is Hill region
+----------------------------------------------------------------------
+42 percent
+
+Source: page 1 (Statistical_Nepalese_Agriculture-9-45_p1_t0)
+
+======================================================================
+Q17: how many square kilometers does the Mountain belt cover
+----------------------------------------------------------------------
+The Mountain belt covers 51,817 square kilometers.
+
+Source: page 1 (Statistical_Nepalese_Agriculture-9-45_p1_t0)
+
+======================================================================
+Q18: how much honey was produced in 2021/22
+----------------------------------------------------------------------
+5,168 metric tonnes
+
+Source: page 33 (Statistical_Nepalese_Agriculture-9-45_p33_t41) -- Table 2.10:   Mulberry, Cocoon: Area and Production Status
+
+======================================================================
+Q19: what was mushroom production in 2018/19
+----------------------------------------------------------------------
+Mushroom production in 2018/19 was 11,255 metric tonnes.
+
+Source: page 33 (Statistical_Nepalese_Agriculture-9-45_p33_t41) -- Table 2.10:   Mulberry, Cocoon: Area and Production Status
+
+======================================================================
+Q20: what was mulberry cocoon area in 2022/23
+----------------------------------------------------------------------
+644 hectares (2022/23)
+
+Source: page 33 (Statistical_Nepalese_Agriculture-9-45_p33_t41) -- Table 2.10:   Mulberry, Cocoon: Area and Production Status
+
+======================================================================
+Q21: how much wool was produced in 2080/81
+----------------------------------------------------------------------
+389,742 kilograms
+
+Source: page 2 (Statistical_Nepalese_Agriculture-9-45_p2_t8)
+
+======================================================================
+Q22: how many eggs does Nepal produce
+----------------------------------------------------------------------
+Nepal produces 1,645,407 thousand eggs in the fiscal year 2080/81 (2023/24).
+
+Source: page 2 (Statistical_Nepalese_Agriculture-9-45_p2_t8)
+
+======================================================================
+Q23: how much cow milk is produced
+----------------------------------------------------------------------
+Nepal produced 1,281,718 metric tonnes of cow milk in the fiscal year 2080/81 (2023/24).
+
+Source: page 2 (Statistical_Nepalese_Agriculture-9-45_p2_t8)
+
+======================================================================
+Q24: which province produced the most paddy in 2080/81
+----------------------------------------------------------------------
+Koshi produced the most paddy in 2080/81 with 1,435,578 metric tonnes.
+
+Source: page 6 (Statistical_Nepalese_Agriculture-9-45_p6_t12)
+
+======================================================================
+Q25: which province produced the least paddy in 2080/81
+----------------------------------------------------------------------
+Karnali produced the least paddy in 2080/81 with 145,063 metric tonnes.
+
+Source: page 6 (Statistical_Nepalese_Agriculture-9-45_p6_t12)
+
+======================================================================
+Q26: which province had the highest wheat production in 2080/81
+----------------------------------------------------------------------
+Madhesh had the highest wheat production in 2080/81 with 631,060 metric tonnes.
+
+Source: page 6 (Statistical_Nepalese_Agriculture-9-45_p6_t12)
+
+======================================================================
+Q27: which province grew the most millet in 2080/81
+----------------------------------------------------------------------
+Koshi grew the most millet in 2080/81 with a production of 87,344.
+
+Source: page 6 (Statistical_Nepalese_Agriculture-9-45_p6_t12)
+
+======================================================================
+Q28: which district has the most tea estates
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 36, in <module>
+    from vocabulary import Vocabulary
+ModuleNotFoundError: No module named 'vocabulary'
+
+======================================================================
+Q29: which district produced the most coffee
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 36, in <module>
+    from vocabulary import Vocabulary
+ModuleNotFoundError: No module named 'vocabulary'
+
+======================================================================
+Q30: which cereal crop had the highest production in 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 36, in <module>
+    from vocabulary import Vocabulary
+ModuleNotFoundError: No module named 'vocabulary'
+
+======================================================================
+Q31: which fertilizer sold the most in 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q32: which livestock category had the highest population in 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q33: what was the total cereal production in 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q34: what was the total cereal production in 2078/79
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q35: what was the total cash crop production in 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q36: what's the combined production of maize and wheat in 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q37: what's the combined area of paddy and maize in 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q38: how did paddy production change from 2078/79 to 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q39: how did wheat production change from 2078/79 to 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q40: how did cattle population change from 2078/79 to 2080/81
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q41: how many tea estates are there in Ilam
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q42: what is the total tea area in Ilam
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q43: what's the total tea production
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q44: how many small coffee farmers are in Kaski
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q45: what's the coffee production in Kaski
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q46: how much quinoa was grown in Koshi
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q47: how much paddy did Atlantis produce
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q48: what was the paddy production in 1990
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q49: what was Large Cardamom production in Taplejung
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+
+======================================================================
+Q50: what's the yield of Dry Chilli nationally
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "E:\Dibika_new\Projects\DOCLING_1\ask_all.py", line 30, in <module>
+    from route import route_question
+  File "E:\Dibika_new\Projects\DOCLING_1\route.py", line 9, in <module>
+    from extract_intent import call_ollama
+ModuleNotFoundError: No module named 'extract_intent'
+

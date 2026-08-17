@@ -14,12 +14,17 @@ Usage:
 """
 import argparse
 import sqlite3
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "retrieval"))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "generation"))
 
 parser = argparse.ArgumentParser()
 parser.add_argument("question", nargs="+")
-parser.add_argument("--db", default="fact.db")
-parser.add_argument("--raw-db", default="raw_tables.db")
-parser.add_argument("--chroma-dir", default="chroma_store")
+parser.add_argument("--db", default="data/fact.db")
+parser.add_argument("--raw-db", default="data/raw_tables.db")
+parser.add_argument("--chroma-dir", default="data/chroma_store")
 parser.add_argument("--model", default="qwen2.5:7b-instruct")
 parser.add_argument("--force", choices=["numeric", "prose"], help="skip the router")
 parser.add_argument("-v", "--verbose", action="store_true")

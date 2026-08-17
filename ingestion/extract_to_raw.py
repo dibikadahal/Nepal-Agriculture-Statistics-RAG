@@ -136,7 +136,7 @@ def extract_pdf_to_raw_db(pdf_path: str, db_path: str, verbose: bool = False) ->
 def main() -> None:
     parser = argparse.ArgumentParser(description="Extract a PDF into a raw HTML/text SQLite database.")
     parser.add_argument("pdf", help="Path to the source PDF")
-    parser.add_argument("--db", default="raw_tables.db", help="Output SQLite database path")
+    parser.add_argument("--db", default="data/raw_tables.db", help="Output SQLite database path")
     parser.add_argument("-v", "--verbose", action="store_true", help="Print each table as it's extracted")
     args = parser.parse_args()
 

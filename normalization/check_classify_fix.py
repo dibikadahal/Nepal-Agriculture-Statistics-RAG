@@ -10,7 +10,7 @@ import argparse
 from classify_entity import build_district_vocab, classify_entity
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--fact-db", default="fact.db")
+parser.add_argument("--fact-db", default="data/fact.db")
 args = parser.parse_args()
 
 vocab = build_district_vocab(args.fact_db)

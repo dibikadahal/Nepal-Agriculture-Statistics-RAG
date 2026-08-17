@@ -63,5 +63,5 @@ def main(db_path):
         print()
 
 if __name__ == "__main__":
-    p = argparse.ArgumentParser(); p.add_argument("--db", default="fact.db")
+    p = argparse.ArgumentParser(); p.add_argument("--db", default="data/fact.db")
     main(p.parse_args().db)
