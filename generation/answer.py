@@ -11,10 +11,6 @@ and passed in as text, so even derived numbers never originate from the
 model. Multi-crop totals (query_fact.run_query, the "crops" intent case)
 follow the same rule: summed in Python, handed over as a ready-made line.
 """
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "retrieval"))
 from extract_intent import call_ollama
 
 ANSWER_SYSTEM = """You write one or two plain sentences answering a question about Nepali agriculture statistics.
@@ -22,14 +18,11 @@ ANSWER_SYSTEM = """You write one or two plain sentences answering a question abo
 You are given the exact figures retrieved from a database. Rules:
 - Use ONLY the numbers given to you. Never compute, adjust, round differently, or invent a figure.
 - Describe each figure EXACTLY as it is labelled. If a figure is labelled
-  "all crops combined", it is a total across every item -- do NOT attribute it
-  to whichever single item the question mentioned. If the question asked about
-  one item but the figure given is a combined total, say so plainly instead of
-  presenting the total as that item's value.
-- If a line is labelled "computed total", that is the already-summed answer to
-  a multi-item question (e.g. two named crops combined) -- report that number
-  as the total. Do NOT add up the individual crop lines above it yourself; the
-  combined figure is already done for you.
+  "all crops combined" or "(sector total)", report it as exactly that --
+  do NOT attribute it to a single item the question mentioned unless the
+  label itself names that item. If the question asked about one item but
+  the figure given is a combined or sector total, say so plainly instead
+  of presenting the total as that item's value.
 - If the answer covers a fiscal year, name it.
 - Be direct. No preamble, no bullet points, no restating the question.
 - Use exactly the unit shown next to a figure. Only when NO unit is shown next to a figure, fall back to: production = metric tonnes, area = hectares, yield = metric tonnes per hectare. Never say metric tonnes when a different unit is given.
@@ -61,7 +54,13 @@ def format_rows(rows, meta):
         if key in seen:
             continue
         seen.add(key)
-        crop = r["crop"] or "all crops combined"
+        sector = r["sector"] if "sector" in r.keys() else None
+        # crop=None can mean two different things: a genuine cross-everything
+        # total (rare -- sector is also None), or one specific sector's own
+        # stated total row (e.g. Cereal Crops' 11,293,841). Conflating them
+        # as "all crops combined" produced a nonsense sentence when comparing
+        # two sector totals ("the all crops combined sector produced more").
+        crop = r["crop"] or (f"{sector} (sector total)" if sector else "all crops combined")
         unit = r["unit"] if "unit" in r.keys() else None
         unit_str = f" {unit}" if unit else ""
         lines.append(
