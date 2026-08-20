@@ -300,7 +300,4 @@ These are deliberate, honestly-refusing gaps — not silent bugs:
 Originally built as a cloud-based RAG system (Gemini embeddings, Gemini Vision, Gemini models) — which worked well. This version was rebuilt to run fully locally on Qwen2.5:7B, which surfaced a much harder problem: the source PDF's wide variety of table structures broke every off-the-shelf extractor tried (a general PDF parser, Ollama vision, LLaVA) before Docling's structured HTML extraction made a reliable pipeline possible.
 
 The bigger lesson from the rebuild: **on a local, resource-constrained stack, generality and accuracy trade off against each other.** A system general enough to handle any PDF's table structure has to trust heuristics to guess column meanings correctly; a system built to be accurate has every table's meaning reviewed and confirmed against the source. This project chose accuracy, deliberately, for one well-understood document — rather than partial correctness across many.
-└── data/
-├── raw_tables.db # Ingestion output
-├── fact.db # Normalization output (fact_generic table)
-└── chroma_store/ # Vector index (gitignored — regenerable)
+
