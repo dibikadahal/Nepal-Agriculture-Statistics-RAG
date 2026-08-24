@@ -104,7 +104,7 @@ Both call the exact same `retrieval/` and `generation/` modules — no logic is 
 
 ## Folder structure
 ```
-DOCLING_1/
+Nepal Agriculture Statistics RAG/
 |-- ask_all.py              # CLI entry point
 |-- app.py                  # Streamlit chatbot UI
 |-- run_pipeline.py         # Orchestrates the offline build (stages 1-3 + smoke tests)
