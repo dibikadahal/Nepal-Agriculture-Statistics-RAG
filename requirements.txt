@@ -1,0 +1,13 @@
+# Python dependencies for the Nepal Agriculture Statistics RAG project.
+# Install (with the venv activated):
+#   uv pip install -r requirements.txt
+#
+# Also required, outside Python: Ollama running locally (ollama serve)
+# with both models pulled:
+#   ollama pull qwen2.5:7b-instruct   (intent extraction + answers)
+#   ollama pull nomic-embed-text      (embeddings for the prose path)
+
+streamlit==1.61.1        # chatbot UI (app.py)
+chromadb==1.5.9          # vector store for the prose path
+docling==2.118.0         # PDF table extraction (ingestion/extract_to_raw.py)
+beautifulsoup4==4.15.0   # HTML/table parsing during ingestion
